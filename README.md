@@ -1,18 +1,18 @@
 # ExplorAstur
 
-ExplorAstur is a simple web scraper that finds events happening in Asturias, Spain and outputs them to a markdown file.
+ExplorAstur is a minimal web scraper that finds events happening in Asturias, Spain from the Telecable blog and outputs them to a markdown file.
 
 ## Setup
 
 ### Requirements
 - Python 3.13+
-- Required packages: requests, beautifulsoup4, pyyaml
+- Required packages: requests, beautifulsoup4
 
 ### Quick Start
 
 1. **Install dependencies**:
    ```bash
-   pip install requests beautifulsoup4 pyyaml
+   pip install requests beautifulsoup4
    ```
 
 2. **Run the scraper**:
@@ -24,31 +24,17 @@ ExplorAstur is a simple web scraper that finds events happening in Asturias, Spa
 
 ## How It Works
 
-The tool is simple:
-1. Loads source configurations from `config.yaml`
-2. Fetches content from each website
-3. Parses events from HTML content
-4. Organizes them into a markdown file by category
-
-## Configuration
-
-Just add sources to `config.yaml`:
-
-```yaml
-# Sources
-sources:
-  - name: Blog Telecable Asturias
-    url: https://blog.telecable.es/agenda-planes-asturias/
-    category: Oficial
-```
+The tool is extremely simple:
+1. Fetches content from the Telecable blog
+2. Parses events from HTML content
+3. Organizes them into a markdown file
 
 ## Project Structure
 
-The project is minimal:
+The project couldn't be more minimal:
 
 ```
 explorastur/
-├── config.yaml          # Configuration file
 ├── scraper.py           # The scraper code (everything in one file)
 ├── README.md            # Documentation
 ├── logs/                # Log files (created automatically)
@@ -58,7 +44,7 @@ explorastur/
 
 ## Troubleshooting
 
-- **Missing data**: Check the website structure hasn't changed
+- **Missing data**: Check if the Telecable blog structure has changed
 - **Connection errors**: Ensure you have a stable internet connection
 
 ## Important Notes

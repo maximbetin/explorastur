@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-ExplorAstur - Simple event scraper for Asturias
------------------------------------------------
-This script scrapes event information from various websites
-and outputs it to a markdown file.
+ExplorAstur - Simple Telecable event scraper for Asturias
+---------------------------------------------------------
+Simple script that scrapes events from Telecable blog
+and outputs them to a markdown file.
 """
 
 import os
@@ -14,7 +14,6 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import sys
-from typing import List, Dict, Any, Optional, Tuple
 
 # Create directories
 os.makedirs('logs', exist_ok=True)
@@ -37,13 +36,34 @@ if not logger.handlers:
     logger.addHandler(file_handler)
     logger.info(f"Logging to file: {log_file}")
 
-def scrape_telecable(source):
+def get_current_month_year():
+    """Get the current month name in Spanish and year."""
+    months = {
+        1: "Enero",
+        2: "Febrero",
+        3: "Marzo",
+        4: "Abril",
+        5: "Mayo",
+        6: "Junio",
+        7: "Julio",
+        8: "Agosto",
+        9: "Septiembre",
+        10: "Octubre",
+        11: "Noviembre",
+        12: "Diciembre"
+    }
+    now = datetime.datetime.now()
+    return f"{months[now.month]} {now.year}"
+
+def scrape_telecable():
     """Scrape events from Blog Telecable Asturias."""
     events = []
+    url = "https://blog.telecable.es/agenda-planes-asturias/"
 
-    # Fetch the page
-    url = source.get('url')
     logger.info(f"Fetching URL: {url}")
+
+    # Get current month and year
+    current_month_year = get_current_month_year()
 
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -65,25 +85,25 @@ def scrape_telecable(source):
         logger.error(f"Error parsing HTML: {e}")
         return []
 
-    logger.info(f"Using specialized parser for {source.get('name')}")
+    logger.info("Using Telecable parser")
 
-    # Extract category sections (h2 elements)
-    current_category = "General"
-    current_category_image = ""
+    # Variables to track current section
+    current_section = ""
+    current_image = ""
 
-    # Process the article body to find categories and events
+    # Process the article body to find events
     for element in article_body.find_all(['h2', 'p', 'figure']):
-        # Process h2 tags as category headers
+        # Process h2 tags as section markers
         if element.name == 'h2':
-            current_category = element.get_text(strip=True)
-            current_category_image = ""
+            current_section = element.get_text(strip=True)
+            current_image = ""
             continue
 
-        # Process figures with images for the current category
-        if element.name == 'figure' and not current_category_image:
+        # Process figures with images
+        if element.name == 'figure' and not current_image:
             img = element.find('img')
             if img and img.get('src'):
-                current_category_image = img.get('src')
+                current_image = img.get('src')
             continue
 
         # Process paragraphs for events
@@ -102,6 +122,12 @@ def scrape_telecable(source):
                 # Extract date
                 date_match = re.search(r'(\d+(?:\s+y\s+\d+)?\s+de\s+[a-zA-Z]+)', event_title) or re.search(r'(\d+(?:\s+y\s+\d+)?\s+de\s+[a-zA-Z]+)', full_text)
                 event_date = date_match.group(1) if date_match else ""
+
+                # Check for month-long events
+                month_long = False
+                if not event_date and ("Durante todo el mes" in event_title or "todo el mes" in full_text):
+                    event_date = current_month_year
+                    month_long = True
 
                 # Extract location
                 location_patterns = [
@@ -124,6 +150,9 @@ def scrape_telecable(source):
                     for link in links:
                         if link.get('href'):
                             event_url = link.get('href')
+                            # Skip if the URL is the same as the blog URL
+                            if event_url == url:
+                                event_url = ""
                             break
 
                 # If no URL was found, check the next paragraph
@@ -133,24 +162,28 @@ def scrape_telecable(source):
                         links = next_p.find_all('a')
                         if links:
                             for link in links:
-                                if link.get('href'):
+                                if link.get('href') and link.get('href') != url:
                                     event_url = link.get('href')
                                     break
 
+                # Clean up the title - remove date prefix if it matches the extracted date
+                clean_title = event_title.replace(':', '').strip()
+                if event_date and clean_title.startswith(event_date):
+                    clean_title = clean_title[len(event_date):].strip()
+
                 # Create event
                 events.append({
-                    'title': event_title.replace(':', '').strip(),
+                    'title': clean_title,
                     'date': event_date,
                     'location': event_location.strip(),
                     'description': full_text.replace(event_title, '').strip(),
                     'url': event_url if event_url.startswith(('http://', 'https://')) else f"{url.rstrip('/')}/{event_url.lstrip('/')}",
-                    'image': current_category_image if current_category_image.startswith(('http://', 'https://')) else "",
-                    'category': current_category,
-                    'source': source.get('name')
+                    'image': current_image if current_image.startswith(('http://', 'https://')) else "",
+                    'source': "Blog Telecable Asturias"
                 })
 
             # Case 2: Festival listings (in fiestas sections)
-            elif "Nos vamos de fiestas" in current_category or "fiestas" in current_category.lower():
+            elif "fiestas" in current_section.lower():
                 text = element.get_text(strip=True)
 
                 # Skip short paragraphs
@@ -164,14 +197,24 @@ def scrape_telecable(source):
 
                 event_date = date_match.group(1)
 
-                # Extract title
-                event_title = text.split(":", 1)[1].strip() if ":" in text else text
+                # Extract title and clean it
+                if ":" in text:
+                    event_title = text.split(":", 1)[1].strip()
+                else:
+                    event_title = text
+
+                # Clean up title - remove date patterns
+                for pattern in [r'\d+\s+de\s+[a-zA-Z]+:', r'\d+\s+a\s+\d+\s+de\s+[a-zA-Z]+:', r'\d+-\d+\s+de\s+[a-zA-Z]+:']:
+                    event_title = re.sub(pattern, '', event_title).strip()
 
                 # Extract URL
                 event_url = ""
                 link = element.find('a')
                 if link and link.get('href'):
                     event_url = link.get('href')
+                    # Skip if the URL is the same as the blog URL
+                    if event_url == url:
+                        event_url = ""
 
                 # Create event
                 events.append({
@@ -180,9 +223,8 @@ def scrape_telecable(source):
                     'location': 'Asturias',
                     'description': text,
                     'url': event_url if event_url.startswith(('http://', 'https://')) else f"{url.rstrip('/')}/{event_url.lstrip('/')}",
-                    'image': current_category_image if current_category_image.startswith(('http://', 'https://')) else "",
-                    'category': 'Festivales y Fiestas',
-                    'source': source.get('name')
+                    'image': current_image if current_image.startswith(('http://', 'https://')) else "",
+                    'source': "Blog Telecable Asturias"
                 })
 
     logger.info(f"Successfully extracted {len(events)} events")
@@ -190,96 +232,88 @@ def scrape_telecable(source):
 
 def main():
     """Main execution function."""
-    logger.info("Starting ExplorAstur - Asturias events scraper")
+    logger.info("Starting ExplorAstur - Telecable events scraper")
 
-    # Load configuration
-    try:
-        with open('config.yaml', 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-            if not isinstance(config, dict) or 'sources' not in config or not isinstance(config['sources'], list):
-                logger.error("Invalid configuration: missing or invalid 'sources'")
-                return
-        logger.info("Loaded configuration")
-    except Exception as e:
-        logger.error(f"Error loading config: {e}")
+    # Get current month year
+    current_month_year = get_current_month_year()
+
+    # Scrape events from Telecable
+    events = scrape_telecable()
+
+    if not events:
+        logger.warning("No events found")
         return
 
-    all_events = []
-
-    # Process each source
-    for source in config.get('sources', []):
-        source_name = source.get('name', 'Unknown')
-        logger.info(f"Processing source: {source_name}")
-
-        # Use the appropriate scraper based on source name
-        if source_name == "Blog Telecable Asturias":
-            events = scrape_telecable(source)
-        else:
-            logger.warning(f"Unsupported source: {source_name}")
-            continue
-
-        if events:
-            logger.info(f"Found {len(events)} events from {source_name}")
-            all_events.extend(events)
-        else:
-            logger.warning(f"No events found from {source_name}")
+    logger.info(f"Found {len(events)} events")
 
     # Clean events data
     clean_events = []
-    for event in all_events:
-        clean_events.append({
-            'title': event.get('title', '').strip(),
-            'date': event.get('date', '').strip(),
-            'location': event.get('location', '').strip(),
-            'description': event.get('description', '').strip(),
-            'url': event.get('url', '').strip(),
-            'image': event.get('image', '').strip(),
-            'category': event.get('category', 'General').strip(),
-            'source': event.get('source', 'Unknown').strip()
-        })
+    for event in events:
+        # Clean title - remove repeating date patterns
+        title = event.get('title', '').strip()
+        date_pattern = event.get('date', '').strip()
+        if date_pattern and title.startswith(date_pattern):
+            title = title[len(date_pattern):].strip()
+
+        # Further clean titles that start with common date prefixes
+        title = re.sub(r'^(\d+\s+de\s+[a-zA-Z]+\s+)', '', title)
+
+        # Check if URL is blank or points to the main blog
+        url = event.get('url', '').strip()
+        if url == "https://blog.telecable.es/agenda-planes-asturias/":
+            url = ""
+
+        # Filter out non-events
+        non_event_patterns = [
+            r'agenda',
+            r'asturias en [a-z]+',
+            r'¿quieres saber',
+            r'planes',
+            r'vamos allá'
+        ]
+
+        is_non_event = False
+        for pattern in non_event_patterns:
+            if re.search(pattern, title.lower()):
+                is_non_event = True
+                break
+
+        # Add to clean events only if it's not a non-event and has a meaningful title
+        if title and not is_non_event:
+            clean_events.append({
+                'title': title,
+                'date': date_pattern or current_month_year, # Default to current month/year if no date
+                'location': event.get('location', '').strip() or "N/A",
+                'url': url
+            })
 
     # Export to markdown
-    if not clean_events:
-        logger.warning("No events to export")
-        return
-
     date_str = datetime.datetime.now().strftime('%Y-%m-%d')
     output_file = f'output/events_{date_str}.md'
 
-    # Group by category
-    by_category = {}
+    # Sort by date
+    clean_events.sort(key=lambda x: x.get('date', ''))
+
+    # Build markdown - simple list format
+    md = ["# Eventos en Asturias\n", f"_Actualizado: {datetime.datetime.now().strftime('%d-%m-%Y')}_\n\n"]
+
+    # Add events in a simple list format
     for event in clean_events:
-        category = event.get('category', 'General')
-        if category not in by_category:
-            by_category[category] = []
-        by_category[category].append(event)
+        date_info = event.get('date') or current_month_year
+        location = event.get('location')
 
-    # Build markdown
-    md = ["# Eventos en Asturias\n", f"_Actualizado: {datetime.datetime.now().strftime('%d-%m-%Y')}_\n", "\n## Índice\n"]
+        # Format: Date: Title - Location - URL
+        line = f"- {date_info}: {event.get('title')}"
 
-    # Add table of contents
-    for category in sorted(by_category.keys()):
-        anchor = category.lower().replace(' ', '-').replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
-        md.append(f"- [{category}](#{anchor}) ({len(by_category[category])} eventos)\n")
+        # Add location if available (not N/A)
+        if location and location != "N/A":
+            line += f" - {location}"
 
-    # Add events by category
-    for category in sorted(by_category.keys()):
-        anchor = category.lower().replace(' ', '-').replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
-        md.append(f"\n## {category}\n\n")
+        # Add URL if available and not the blog URL
+        if event.get('url'):
+            line += f" - [Enlace]({event.get('url')})"
 
-        for event in by_category[category]:
-            md.append(f"### {event.get('title', 'Sin título')}\n\n")
-            md.append(f"- **Fecha:** {event.get('date', 'Fecha no especificada')}\n")
-            md.append(f"- **Lugar:** {event.get('location', 'Ubicación no especificada')}\n")
-            md.append(f"- **Fuente:** {event.get('source', 'Desconocida')}\n")
-
-            if event.get('url'):
-                md.append(f"- **Enlace:** [{event.get('url')}]({event.get('url')})\n")
-
-            if event.get('description'):
-                md.append(f"\n{event.get('description')}\n\n")
-
-            md.append("---\n\n")
+        md.append(line + "\n")
 
     # Write to file
     with open(output_file, 'w', encoding='utf-8') as f:
