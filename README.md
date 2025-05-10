@@ -52,6 +52,19 @@ explorastur/
 - Web scraping may be subject to legal restrictions. Always check the terms of service.
 - Website structures change over time. You may need to adjust the scraper occasionally.
 
+## Planned Source
+
+[Viescu](https://viescu.info/)
+[Biodevas](https://biodevas.org/)
+[Aviles](https://aviles.es/proximos-eventos)
+[Visit Oviedo](https://www.visitoviedo.info/agenda)
+[Cines Embajadores](https://cinesembajadores.es/oviedo/)
+[Centros Sociales](https://www.oviedo.es/centrossociales/avisos)
+[Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
+[Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
+[Blog Telecable](https://blog.telecable.es/agenda-planes-asturias/)
+[Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)
+
 ## License
 
 [MIT License]
