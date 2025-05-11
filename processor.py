@@ -136,87 +136,10 @@ class EventProcessor:
 
         return location.strip()
 
-    def categorize_events(self, events):
-        """
-        Categorize events into different types based on keywords in title or description.
-        """
-        categories = {
-            "Conciertos y festivales en Asturias": [],
-            "Las mejores obras de teatro en Asturias": [],
-            "Exposiciones en los museos asturianos": [],
-            "Nos vamos de fiestas en Asturias": [],
-            "Más agenda cultural de Asturias": []
-        }
-
-        # Expanded Spanish keywords for better categorization
-        concert_keywords = [
-            'concierto', 'música', 'música en vivo', 'cantante', 'banda', 'rock', 'pop', 'jazz',
-            'festival de música', 'musical', 'ópera', 'orquesta', 'recital', 'canción', 'sonidos',
-            'en directo', 'canciones', 'gira', 'álbum', 'artista', 'artistas', 'morgan', 'pecos',
-            'perro', 'arizona baby', 'jp harris', 'santiago auserón', 'eddy smith', 'el nido',
-            'eva mcbel', 'la habitación roja', 'charlie sexton', 'johnny garso', 'mägo de oz',
-            'miguel póveda', 'paloma san basilio', 'acústicos'
-        ]
-
-        theater_keywords = [
-            'teatro', 'obra', 'escena', 'actores', 'directo', 'espectáculo', 'drama', 'comedia',
-            'danza', 'bailarines', 'personajes', 'escenas', 'obra de teatro', 'martha graham',
-            'campoamor', 'jovellanos', 'niemeyer', 'berto romero', 'seis personajes', 'victoria',
-            'saudade', 'la corte de faraón', 'los lunes al sol', 'blaubeeren', 'la desgracia',
-            'querencia', 'palacio valdés', 'laboral', 'filarmónica'
-        ]
-
-        exhibition_keywords = [
-            'exposición', 'museo', 'galería', 'arte', 'obras', 'pintores', 'pintora',
-            'muestra', 'colección', 'exhibición', 'artistas', 'estaciones interiores',
-            'artistas asturianos', 'bellas artes', 'evaristo valle', 'cmae'
-        ]
-
-        festival_keywords = [
-            'festival', 'feria', 'fiesta', 'jornadas', 'celebración', 'gastronomía',
-            'gastronómicas', 'sidra', 'arroz con leche', 'l.e.v', 'vibra mahou',
-            'san isidro', 'llámpara', 'floración', 'trasona', 'cabranes', 'ascensión'
-        ]
-
-        for event in events:
-            title = event.get('title', '').lower()
-            desc = event.get('description', '').lower()
-            location = event.get('location', '').lower()
-            url = event.get('url', '').lower()
-            combined_text = f"{title} {desc} {location} {url}"
-
-            # Set default category
-            category = "Más agenda cultural de Asturias"
-
-            # Musical events first - most specific
-            if "arizona baby" in combined_text or "jp harris" in combined_text or "eddy smith" in combined_text:
-                category = "Conciertos y festivales en Asturias"
-            elif any(keyword in combined_text for keyword in concert_keywords):
-                category = "Conciertos y festivales en Asturias"
-            # Theater and performances
-            elif "victoria viene a cenar" in combined_text or "seis personajes" in combined_text:
-                category = "Las mejores obras de teatro en Asturias"
-            elif any(keyword in combined_text for keyword in theater_keywords):
-                category = "Las mejores obras de teatro en Asturias"
-            # Exhibitions
-            elif "estaciones interiores" in combined_text or "nido-ritual" in combined_text:
-                category = "Exposiciones en los museos asturianos"
-            elif any(keyword in combined_text for keyword in exhibition_keywords):
-                category = "Exposiciones en los museos asturianos"
-            # Festivals and events
-            elif "festival del arroz" in combined_text or "llámpara" in combined_text:
-                category = "Nos vamos de fiestas en Asturias"
-            elif any(keyword in combined_text for keyword in festival_keywords):
-                category = "Nos vamos de fiestas en Asturias"
-
-            categories[category].append(event)
-
-        # Remove empty categories
-        return {k: v for k, v in categories.items() if v}
-
     def format_to_markdown(self, events):
         """
         Format the events list to a markdown file with all events in a single list.
+        Events with the same date (such as "Durante todo el mes de mayo") will be grouped together.
         """
         if not events:
             return "# No events found"
@@ -228,31 +151,50 @@ class EventProcessor:
         # Add source link as a header
         markdown += "## [Blog Telecable](https://blog.telecable.es/agenda-planes-asturias/)\n\n"
 
-        # Skip categorization and sort all events by date
+        # Sort all events by date
         events.sort(key=lambda x: self.date_processor.date_sort_key(x['date']))
 
-        # Add all events in a single list
+        # Group events by date
+        events_by_date = {}
         for event in events:
-            # Clean up the title - remove any quotes since we're adding them in the markdown
-            title = event['title']
-            if title.startswith('"') and title.endswith('"'):
-                title = title[1:-1]
-            elif title.startswith('"'):
-                title = title[1:]
-            elif title.endswith('"'):
-                title = title[:-1]
+            date = event['date']
+            if date not in events_by_date:
+                events_by_date[date] = []
+            events_by_date[date].append(event)
 
-            # Date first, then event title
-            markdown += f"**{event['date']}**: \"{title}\"\n"
+        # Add all events grouped by date
+        for date, date_events in events_by_date.items():
+            # Add the date as a header
+            markdown += f"**{date}**:\n"
 
-            # Add location if available and not just "Asturias" - use "Lugar" in Spanish
-            if event['location'] and event['location'].lower() != 'asturias':
-                markdown += f"   - Lugar: {event['location']}\n"
+            # Add each event under this date
+            for event in date_events:
+                # Clean up the title - remove any quotes
+                title = event['title']
+                if title.startswith('"') and title.endswith('"'):
+                    title = title[1:-1]
+                elif title.startswith('"'):
+                    title = title[1:]
+                elif title.endswith('"'):
+                    title = title[:-1]
+                # Remove any remaining quotes anywhere in the title
+                title = title.replace('"', '')
 
-            # Add URL if available
-            if event['url']:
-                markdown += f"   - Link: {event['url']}\n"
+                # Add the event title without quotes
+                markdown += f"   - {title}\n"
 
+                # Add location if available and not just "Asturias" - use "Lugar" in Spanish
+                if event['location'] and event['location'].lower() != 'asturias':
+                    markdown += f"     - Lugar: {event['location']}\n"
+
+                # Add URL if available
+                if event['url']:
+                    markdown += f"     - Link: {event['url']}\n"
+
+                # Add a small gap between events with the same date
+                markdown += "\n"
+
+            # Add an extra line break between different dates
             markdown += "\n"
 
         return markdown

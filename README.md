@@ -27,7 +27,8 @@ ExplorAstur is a minimal web scraper that finds events happening in Asturias, Sp
 The tool is extremely simple:
 1. Fetches content from the Telecable blog
 2. Parses events from HTML content
-3. Organizes them into a markdown file
+3. Organizes them into a chronological list in a markdown file
+4. Each source is presented under its own header
 
 ## Date and Month Handling
 
@@ -39,6 +40,26 @@ The system is designed to work with any month or year:
 - **Chronological sorting**: Events are sorted by month and then by day, with month-long events appearing first
 
 This means the scraper will continue to work correctly throughout the year without requiring manual updates to the code when the month changes.
+
+## Output Format
+
+Events are presented in a single chronological list with the following format:
+
+```
+# Eventos en Asturias
+
+_Actualizado: 11/05/2025_
+
+## [Blog Telecable](https://blog.telecable.es/agenda-planes-asturias/)
+
+**Durante todo el mes de mayo**: "Estaciones interiores"
+   - Lugar: Museo de Bellas Artes de Asturias (Oviedo)
+   - Link: https://www.museobbaa.com/exposicion/covadonda-valdes-more-estaciones-interiores/
+
+**11 de mayo**: "Querencia"
+   - Lugar: Teatro Palacio Valdés de Avilés
+   - Link: https://antonionajarro.com/querencia/
+```
 
 ## Project Structure
 
@@ -78,8 +99,8 @@ explorastur/
 ### processor.py
 - `EventProcessor`: Processes raw events
   - Filters out past events
-  - Cleans and enhances data
-  - Formats events to markdown output
+  - Cleans and enhances data (extracting locations, fixing formatting)
+  - Formats events to markdown output in chronological order
 
 ## Data Flow
 
@@ -113,17 +134,17 @@ The codebase follows these design principles:
 - Web scraping may be subject to legal restrictions. Always check the terms of service.
 - Website structures change over time. You may need to adjust the scraper occasionally.
 
-## Planned Source
+## Planned Sources
 
-[Viescu](https://viescu.info/)
-[Biodevas](https://biodevas.org/)
-[Aviles](https://aviles.es/proximos-eventos)
-[Visit Oviedo](https://www.visitoviedo.info/agenda)
-[Cines Embajadores](https://cinesembajadores.es/oviedo/)
-[Centros Sociales](https://www.oviedo.es/centrossociales/avisos)
-[Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
-[Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
-[Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)
+- [Viescu](https://viescu.info/)
+- [Biodevas](https://biodevas.org/)
+- [Aviles](https://aviles.es/proximos-eventos)
+- [Visit Oviedo](https://www.visitoviedo.info/agenda)
+- [Cines Embajadores](https://cinesembajadores.es/oviedo/)
+- [Centros Sociales](https://www.oviedo.es/centrossociales/avisos)
+- [Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
+- [Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
+- [Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)
 
 ## License
 

@@ -20,16 +20,20 @@ os.makedirs('output', exist_ok=True)
 logger = logging.getLogger('explorastur')
 logger.setLevel(logging.INFO)
 if not logger.handlers:
+    # Custom log format
+    log_format = '[%(asctime)s] [%(levelname)s]: %(message)s'
+    date_format = '%H:%M:%S'
+
     # Add console handler
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    console_handler.setFormatter(logging.Formatter(log_format, date_format))
     logger.addHandler(console_handler)
 
     # Add file handler
     today = datetime.datetime.now().strftime('%Y-%m-%d')
     log_file = f'logs/explorastur_{today}.log'
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    file_handler.setFormatter(logging.Formatter(log_format, date_format))
     logger.addHandler(file_handler)
     logger.info(f"Logging to file: {log_file}")
 
