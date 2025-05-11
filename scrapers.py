@@ -786,7 +786,7 @@ class VisitOviedoScraper(EventScraper):
                     logger.info("No pagination found, this is the only page")
                     break
 
-                next_link = pagination.select_one('ul.pager li a:contains("Siguiente")')
+                next_link = pagination.select_one('ul.pager li a:-soup-contains("Siguiente")')
                 if not next_link:
                     # Alternative selector approach if the first one doesn't work
                     links = pagination.select('ul.pager li a')
@@ -813,6 +813,9 @@ class VisitOviedoScraper(EventScraper):
                 current_url = next_url
                 current_page += 1
 
+            except requests.exceptions.RequestException as e:
+                logger.error(f"HTTP error fetching page {current_page}: {e}")
+                break
             except Exception as e:
                 logger.error(f"Error processing page {current_page}: {e}")
                 break
@@ -877,8 +880,12 @@ class VisitOviedoScraper(EventScraper):
 
                     # Get the event URL
                     event_url = event_link.get('href', '')
-                    if event_url and not event_url.startswith('http'):
-                        event_url = f"{self.base_url}{event_url}"
+                    if event_url:
+                        # Make URL absolute if it's relative
+                        if not event_url.startswith('http'):
+                            event_url = f"{self.base_url}{event_url}"
+                    else:
+                        event_url = self.url
 
                     # Create the event
                     event = self._create_event(
@@ -886,7 +893,7 @@ class VisitOviedoScraper(EventScraper):
                         date=event_date,
                         location=location,
                         description="",
-                        url=event_url or self.url,
+                        url=event_url,
                         source="Visit Oviedo"
                     )
 

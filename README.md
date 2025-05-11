@@ -42,7 +42,7 @@ The tool is extremely simple:
 
 ### Pagination Support
 
-The Turismo Asturias scraper now supports pagination, allowing it to:
+The Turismo Asturias and Visit Oviedo scrapers support pagination, allowing them to:
 - Automatically detect the total number of pages
 - Navigate through all result pages (configurable max limit)
 - Collect events from every page
@@ -166,8 +166,19 @@ The codebase follows these design principles:
 
 ## Troubleshooting
 
-- **Missing data**: Check if the website structures have changed (Telecable blog, Turismo Asturias, Oviedo Centros Sociales, or Visit Oviedo)
-- **Connection errors**: Ensure you have a stable internet connection
+- **Website structure changes**: If a site changes its HTML structure, the scraper may stop working properly. Check for the following symptoms and solutions:
+  - Missing events from a specific source: The HTML selectors may need updating
+  - Incomplete data: Date or location extraction patterns may need adjustment
+  - Error messages about "No events found": The website structure has likely changed significantly
+
+- **Connection errors**:
+  - Ensure you have a stable internet connection
+  - Some websites may implement rate limiting or blocking of scraping activities
+  - Try adding delays between requests if you encounter connection issues
+
+- **Pagination issues**:
+  - If you see fewer events than expected, check if the pagination logic is working correctly
+  - The "max_pages" setting (default: 5) can be adjusted in the scraper classes
 
 ## Important Notes
 
