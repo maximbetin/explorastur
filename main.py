@@ -9,7 +9,8 @@ import os
 import datetime
 import logging
 import sys
-from scrapers import TelecableScraper, TurismoAsturiaScraper, OviedoCentrosSocialesScraper, VisitOviedoScraper, BiodevasScraper, AvilesEventsScraper
+import argparse
+from scrapers.factory import create_all_scrapers, create_scraper
 from processor import EventProcessor
 
 # Create necessary directories
@@ -37,6 +38,36 @@ if not logger.handlers:
     logger.addHandler(file_handler)
     logger.info(f"Logging to file: {log_file}")
 
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="ExplorAstur - Event scraper for Asturias tourism websites"
+    )
+
+    parser.add_argument(
+        "--scraper", "-s",
+        dest="scraper_ids",
+        help="Comma-separated list of scraper IDs to run (e.g., 'telecable,aviles')",
+        default=""
+    )
+
+    parser.add_argument(
+        "--output", "-o",
+        dest="output_file",
+        help="Output file path (default: output/events_YYYY-MM-DD.md)",
+        default=""
+    )
+
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Enable debug logging",
+        default=False
+    )
+
+    return parser.parse_args()
+
 def main():
     """
     Main execution function.
@@ -44,19 +75,37 @@ def main():
     Runs all scrapers, processes the collected events, and outputs them to a markdown file.
     The function handles errors gracefully and logs the process along the way.
     """
+    # Parse command line arguments
+    args = parse_args()
+
+    # Set debug level if requested
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled")
+
     logger.info("Starting ExplorAstur - Event scrapers")
     all_events = []
 
     try:
-        # Create scrapers - each scraper is responsible for a different source
-        scrapers = [
-            ('Telecable', TelecableScraper()),
-            ('Turismo Asturias', TurismoAsturiaScraper()),
-            ('Centros Sociales Oviedo', OviedoCentrosSocialesScraper()),
-            ('Visit Oviedo', VisitOviedoScraper()),
-            ('Biodevas', BiodevasScraper()),
-            ('Avilés', AvilesEventsScraper())
-        ]
+        # If specific scrapers are requested, only run those
+        if args.scraper_ids:
+            scraper_ids = [s.strip() for s in args.scraper_ids.split(",")]
+            logger.info(f"Running specific scrapers: {', '.join(scraper_ids)}")
+
+            scrapers = []
+            for scraper_id in scraper_ids:
+                scraper = create_scraper(scraper_id)
+                if scraper:
+                    scrapers.append((scraper.source_name, scraper))
+                else:
+                    logger.warning(f"Scraper '{scraper_id}' not found or could not be created")
+        else:
+            # Otherwise, run all enabled scrapers from the configuration
+            logger.info("Running all enabled scrapers")
+            scrapers = create_all_scrapers()
+
+        # Log the scrapers we're going to run
+        logger.info(f"Scrapers to run: {[name for name, _ in scrapers]}")
 
         # Run each scraper and collect events
         for name, scraper in scrapers:
@@ -84,9 +133,11 @@ def main():
         # Format to markdown
         markdown = processor.format_to_markdown(filtered_events)
 
-        # Write to output file
+        # Determine output file
         date_str = datetime.datetime.now().strftime('%Y-%m-%d')
-        output_file = f'output/events_{date_str}.md'
+        output_file = args.output_file if args.output_file else f'output/events_{date_str}.md'
+
+        # Write to output file
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(markdown)
 
@@ -95,6 +146,8 @@ def main():
 
     except Exception as e:
         logger.error(f"Error running scrapers: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         sys.exit(1)
 
 if __name__ == "__main__":
