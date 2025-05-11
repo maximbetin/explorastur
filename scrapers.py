@@ -9,6 +9,7 @@ import re
 from utils import DateProcessor, TextProcessor
 import datetime
 from bs4.element import Tag
+import json
 
 logger = logging.getLogger('explorastur')
 
@@ -327,7 +328,7 @@ class TurismoAsturiaScraper(EventScraper):
         super().__init__()
         self.base_url = "https://www.turismoasturias.es"
         self.url = f"{self.base_url}/agenda-de-asturias"
-        self.max_pages = 5  # Maximum number of pages to scrape to avoid excessive requests
+        self.max_pages = 3  # Maximum number of pages to scrape to avoid excessive requests
 
     def scrape(self):
         """Scrape events from Turismo Asturias website with pagination support."""
@@ -387,10 +388,20 @@ class TurismoAsturiaScraper(EventScraper):
                 all_events.extend(page_events)
                 logger.info(f"Extracted {len(page_events)} events from page {current_page}")
 
-                # Check if there are more pages
-                # Look for a "disabled" last page link which indicates we're on the last page
-                last_page_links = soup.select('li.last.disabled')
-                if last_page_links:
+                # Check if there's a next page by looking for pagination links
+                pagination = soup.select_one('nav.pagination')
+                if not pagination:
+                    logger.info("No pagination found, this is the only page")
+                    break
+
+                next_link = pagination.select_one('a.pagination__next')
+                is_disabled = False
+                if next_link and next_link.has_attr('class'):
+                    class_list = next_link['class']
+                    if isinstance(class_list, list) and 'disabled' in class_list:
+                        is_disabled = True
+
+                if not next_link or is_disabled:
                     logger.info("Reached last page of results")
                     break
 
@@ -777,7 +788,7 @@ class VisitOviedoScraper(EventScraper):
         super().__init__()
         self.base_url = "https://www.visitoviedo.info"
         self.url = f"{self.base_url}/agenda"
-        self.max_pages = 5  # Maximum number of pages to scrape
+        self.max_pages = 3  # Maximum number of pages to scrape
 
     def scrape(self):
         """Scrape events from Visit Oviedo tourism website with pagination support."""

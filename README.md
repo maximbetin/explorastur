@@ -5,7 +5,7 @@ ExplorAstur is a minimal web scraper that finds events happening in Asturias, Sp
 ## Setup
 
 ### Requirements
-- Python 3.13+
+- Python 3.9+
 - Dependencies listed in requirements.txt
 
 ### Quick Start
@@ -178,16 +178,32 @@ The codebase follows these design principles:
 
 - **Pagination issues**:
   - If you see fewer events than expected, check if the pagination logic is working correctly
-  - The "max_pages" setting (default: 5) can be adjusted in the scraper classes
+  - The "max_pages" setting (default: 3) can be adjusted in the scraper classes
 
-## Important Notes
+## Adding New Scrapers
 
-- Web scraping may be subject to legal restrictions. Always check the terms of service.
-- Website structures change over time. You may need to adjust the scraper occasionally.
+To add a new scraper:
+
+1. Create a new class in `scrapers.py` that inherits from `EventScraper`
+2. Implement the `scrape()` method to return a list of event dictionaries
+3. Add your scraper to the list in `main.py`
+
+Example:
+
+```python
+class NewSourceScraper(EventScraper):
+    def __init__(self):
+        super().__init__()
+        self.url = "https://example.com/events"
+
+    def scrape(self):
+        # Your scraping logic here
+        events = []
+        # ... scraping code ...
+        return events
+```
 
 ## Planned Sources
-
-- [Viescu](https://viescu.info/)
 - [Biodevas](https://biodevas.org/)
 - [Aviles](https://aviles.es/proximos-eventos)
 - [Cines Embajadores](https://cinesembajadores.es/oviedo/)

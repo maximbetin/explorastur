@@ -12,7 +12,7 @@ import sys
 from scrapers import TelecableScraper, TurismoAsturiaScraper, OviedoCentrosSocialesScraper, VisitOviedoScraper
 from processor import EventProcessor
 
-# Create directories
+# Create necessary directories
 os.makedirs('logs', exist_ok=True)
 os.makedirs('output', exist_ok=True)
 
@@ -38,12 +38,17 @@ if not logger.handlers:
     logger.info(f"Logging to file: {log_file}")
 
 def main():
-    """Main execution function."""
+    """
+    Main execution function.
+
+    Runs all scrapers, processes the collected events, and outputs them to a markdown file.
+    The function handles errors gracefully and logs the process along the way.
+    """
     logger.info("Starting ExplorAstur - Event scrapers")
     all_events = []
 
     try:
-        # Create scrapers
+        # Create scrapers - each scraper is responsible for a different source
         scrapers = [
             ('Telecable', TelecableScraper()),
             ('Turismo Asturias', TurismoAsturiaScraper()),
@@ -51,7 +56,7 @@ def main():
             ('Visit Oviedo', VisitOviedoScraper())
         ]
 
-        # Run each scraper
+        # Run each scraper and collect events
         for name, scraper in scrapers:
             logger.info(f"Running {name} scraper")
             events = scraper.scrape()
@@ -63,20 +68,21 @@ def main():
             logger.info(f"Found {len(events)} events from {name}")
             all_events.extend(events)
 
+        # Check if we found any events
         if not all_events:
             logger.warning("No events found from any source")
             return
 
         logger.info(f"Total events collected: {len(all_events)}")
 
-        # Process events
+        # Process events (filter, clean, etc.)
         processor = EventProcessor()
         filtered_events = processor.process_events(all_events)
 
         # Format to markdown
         markdown = processor.format_to_markdown(filtered_events)
 
-        # Write to file
+        # Write to output file
         date_str = datetime.datetime.now().strftime('%Y-%m-%d')
         output_file = f'output/events_{date_str}.md'
         with open(output_file, 'w', encoding='utf-8') as f:
