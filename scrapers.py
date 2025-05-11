@@ -747,26 +747,84 @@ class VisitOviedoScraper(EventScraper):
 
     def __init__(self):
         super().__init__()
-        self.url = "https://www.visitoviedo.info/agenda"
+        self.base_url = "https://www.visitoviedo.info"
+        self.url = f"{self.base_url}/agenda"
+        self.max_pages = 5  # Maximum number of pages to scrape
 
     def scrape(self):
-        """Scrape events from Visit Oviedo tourism website."""
+        """Scrape events from Visit Oviedo tourism website with pagination support."""
+        all_events = []
+        current_page = 1
+        pages_processed = 0
+        current_url = self.url
+
+        logger.info(f"Starting pagination scrape of Visit Oviedo (max {self.max_pages} pages)")
+
+        while current_page <= self.max_pages:
+            logger.info(f"Fetching page {current_page}: {current_url}")
+
+            try:
+                # Fetch the current page
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                response = requests.get(current_url, headers=headers, timeout=30)
+                response.raise_for_status()
+                html = response.text
+
+                # Parse HTML
+                soup = BeautifulSoup(html, 'html.parser')
+
+                # Process the current page
+                page_events = self._process_page(soup)
+                all_events.extend(page_events)
+
+                logger.info(f"Extracted {len(page_events)} events from page {current_page}")
+                pages_processed += 1
+
+                # Find "Next" link for pagination
+                pagination = soup.select_one('div.paginator')
+                if not pagination:
+                    logger.info("No pagination found, this is the only page")
+                    break
+
+                next_link = pagination.select_one('ul.pager li a:contains("Siguiente")')
+                if not next_link:
+                    # Alternative selector approach if the first one doesn't work
+                    links = pagination.select('ul.pager li a')
+                    next_link = None
+                    for link in links:
+                        if 'Siguiente' in link.text:
+                            next_link = link
+                            break
+
+                if not next_link:
+                    logger.info("Reached last page of results")
+                    break
+
+                # Get URL for next page
+                next_url = next_link.get('href')
+                if not next_url:
+                    logger.info("No next page URL found")
+                    break
+
+                # Make the URL absolute if it's relative
+                if not next_url.startswith('http'):
+                    next_url = f"{self.base_url}{next_url}"
+
+                current_url = next_url
+                current_page += 1
+
+            except Exception as e:
+                logger.error(f"Error processing page {current_page}: {e}")
+                break
+
+        logger.info(f"Pagination complete. Scraped {len(all_events)} total events from {pages_processed} pages")
+        return all_events
+
+    def _process_page(self, soup):
+        """Process a single page and extract all events from it."""
         events = []
-        logger.info(f"Fetching URL: {self.url}")
 
         try:
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-            response = requests.get(self.url, headers=headers, timeout=30)
-            response.raise_for_status()
-            html = response.text
-        except Exception as e:
-            logger.error(f"Error fetching {self.url}: {e}")
-            return []
-
-        # Parse HTML
-        try:
-            soup = BeautifulSoup(html, 'html.parser')
-
             # Find all day entries
             day_entries = soup.select('div.day-entry')
 
@@ -817,7 +875,7 @@ class VisitOviedoScraper(EventScraper):
                     # Get the event URL
                     event_url = event_link.get('href', '')
                     if event_url and not event_url.startswith('http'):
-                        event_url = f"https://www.visitoviedo.info{event_url}"
+                        event_url = f"{self.base_url}{event_url}"
 
                     # Create the event
                     event = self._create_event(
@@ -832,8 +890,6 @@ class VisitOviedoScraper(EventScraper):
                     events.append(event)
 
         except Exception as e:
-            logger.error(f"Error parsing HTML: {e}")
-            return []
+            logger.error(f"Error extracting events from page: {e}")
 
-        logger.info(f"Successfully extracted {len(events)} events from Visit Oviedo")
         return events
