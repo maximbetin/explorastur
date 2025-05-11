@@ -146,8 +146,19 @@ explorastur/
   - `DateProcessor`: Handles date parsing, formatting, and comparison
   - `TextProcessor`: Manages text cleaning, extraction, and formatting
 
+### scraper_utils.py
+- Provides common utility functions for all scrapers:
+  - HTML parsing utilities (parse_html, extract_text, extract_attribute)
+  - URL handling utilities (make_absolute_url, extract_url_from_element)
+  - Date extraction utilities (extract_date_from_text, extract_time_from_text)
+  - Location extraction utilities (extract_location_from_text)
+  - Event extraction utilities (extract_common_event_data)
+
 ### scrapers/ Package
 - **base.py**: Base `EventScraper` class with common functionality
+  - Standardized pagination handling via `process_pagination` method
+  - Consistent error handling via `handle_error` and `safe_execute` methods
+  - Common utility methods for all scrapers
 - **config.py**: Centralized configuration system
 - **factory.py**: Factory to create scraper instances
 - **telecable.py**, **turismo_asturias.py**, etc.: Individual scraper implementations
@@ -186,6 +197,14 @@ The codebase follows these design principles:
    - Standardized imports
    - Consistent class structure
    - Clear module purposes
+   - Standardized pagination handling
+   - Consistent error handling
+
+4. **Standardized Utilities**:
+   - All HTML parsing uses the `parse_html` utility
+   - All URL handling uses the `make_absolute_url` utility
+   - All scrapers use the base class `process_pagination` method for pagination
+   - Error handling is consistent through `handle_error` and `safe_execute` methods
 
 ## Troubleshooting
 

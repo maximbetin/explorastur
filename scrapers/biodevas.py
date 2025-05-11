@@ -21,39 +21,18 @@ class BiodevasScraper(EventScraper):
 
     def scrape(self):
         """Scrape events from Biodevas website."""
-        events = []
         logger.info(f"Fetching URL: {self.url}")
 
         try:
-            soup = self.fetch_and_parse(self.url)
-            if not soup:
-                return []
-
-            events = self._extract_events_from_page(soup)
-            logger.info(f"Found {len(events)} events on Biodevas page")
-
-            # Check if there are more pages
-            pagination = soup.select_one('.navigation.pagination .next.page-numbers')
-            if pagination and len(events) > 0:
-                # Only fetch one more page to avoid too many requests
-                next_page_url = pagination.get('href')
-                if next_page_url:
-                    logger.info(f"Fetching next page: {next_page_url}")
-                    # Ensure next_page_url is a string
-                    next_page_url = str(next_page_url)
-                    next_soup = self.fetch_and_parse(next_page_url)
-                    if next_soup:
-                        next_events = self._extract_events_from_page(next_soup)
-                        events.extend(next_events)
-                        logger.info(f"Added {len(next_events)} more events from next page")
-
-            return events
-
+            # Use the base class pagination method
+            return self.process_pagination(
+                base_url=self.base_url,
+                start_url=self.url,
+                extract_page_events=self._extract_events_from_page,
+                next_page_selector='.navigation.pagination .next.page-numbers'
+            )
         except Exception as e:
-            logger.error(f"Error scraping Biodevas: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return []
+            return self.handle_error(e, "scraping Biodevas events", [])
 
     def _extract_events_from_page(self, soup):
         """Extract events from the page content."""

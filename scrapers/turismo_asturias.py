@@ -21,50 +21,18 @@ class TurismoAsturiaScraper(EventScraper):
 
     def scrape(self):
         """Scrape events from Turismo Asturias website with pagination support."""
-        all_events = []
+        logger.info(f"Fetching URL: {self.url}")
 
         try:
-            # Start with the main page
-            current_url = self.url
-            page_count = 0
-
-            while current_url and page_count < self.max_pages:
-                logger.info(f"Fetching URL: {current_url}")
-                soup = self.fetch_and_parse(current_url)
-                if not soup:
-                    break
-
-                # Extract events from current page
-                page_events = self._extract_events_from_page(soup)
-                if page_events:
-                    all_events.extend(page_events)
-                    logger.info(f"Found {len(page_events)} events on page {page_count + 1}")
-
-                # Find link to next page
-                next_link = soup.select_one('ul.lfr-pagination-buttons li:not(.disabled) a:contains("Siguiente")')
-                if next_link and next_link.has_attr('href'):
-                    href = next_link['href']
-                    if isinstance(href, str):
-                        current_url = make_absolute_url(self.base_url, href)
-                else:
-                    next_link = soup.select_one('ul.lfr-pagination-buttons li.last a')
-                    if next_link and next_link.has_attr('href') and 'cur=1' in current_url:
-                        href = next_link['href']
-                        if isinstance(href, str):
-                            current_url = make_absolute_url(self.base_url, href)
-                    else:
-                        current_url = None
-
-                page_count += 1
-
-            logger.info(f"Found {len(all_events)} events in total from Turismo Asturias")
-            return all_events
-
+            # Use the base class pagination method with a custom next page selector
+            return self.process_pagination(
+                base_url=self.base_url,
+                start_url=self.url,
+                extract_page_events=self._extract_events_from_page,
+                next_page_selector='ul.lfr-pagination-buttons li:not(.disabled) a:contains("Siguiente")'
+            )
         except Exception as e:
-            logger.error(f"Error scraping Turismo Asturias: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return all_events
+            return self.handle_error(e, "scraping Turismo Asturias events", [])
 
     def _extract_events_from_page(self, soup):
         """Extract events from a page of results."""

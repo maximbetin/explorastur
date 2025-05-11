@@ -10,6 +10,7 @@ from bs4.element import Tag, NavigableString
 from typing import Dict, List, Optional, Any
 
 from scrapers.base import EventScraper
+from scraper_utils import parse_html
 
 logger = logging.getLogger('explorastur')
 
@@ -23,7 +24,6 @@ class TelecableScraper(EventScraper):
 
     def scrape(self):
         """Scrape events from Blog Telecable Asturias directly from HTML structure."""
-        events = []
         logger.info(f"Fetching URL: {self.url}")
 
         try:
@@ -33,7 +33,11 @@ class TelecableScraper(EventScraper):
                 logger.error(f"Failed to fetch URL: {self.url}")
                 return []
 
-            soup = BeautifulSoup(html, 'html.parser')
+            # Use the parse_html utility instead of direct BeautifulSoup creation
+            soup = parse_html(html)
+            if not soup:
+                logger.error("Failed to parse HTML content")
+                return []
 
             # Find the article body - this is the main content area
             article_body = soup.select_one('.article-body')
@@ -49,6 +53,7 @@ class TelecableScraper(EventScraper):
             logger.info(f"Found article body with {len(list(article_body.children))} child elements")
 
             # Extract categories and their events
+            events = []
             categories = {}
             current_category = "General"
 
@@ -105,10 +110,7 @@ class TelecableScraper(EventScraper):
             return events
 
         except Exception as e:
-            logger.error(f"Error scraping Telecable: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return []
+            return self.handle_error(e, "scraping Telecable", [])
 
     def _parse_event(self, title, details, category):
         """Parse an event from its title and details text."""

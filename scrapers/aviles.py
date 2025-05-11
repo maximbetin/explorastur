@@ -22,37 +22,18 @@ class AvilesEventsScraper(EventScraper):
 
     def scrape(self):
         """Scrape events from Avilés website."""
-        events = []
         logger.info(f"Fetching URL: {self.url}")
 
         try:
-            soup = self.fetch_and_parse(self.url)
-            if not soup:
-                return []
-
-            events = self._extract_events_from_page(soup)
-            logger.info(f"Found {len(events)} events on Avilés page")
-
-            # Check for pagination
-            pagination = soup.select_one('.pagination .page-link')
-            if pagination and 'Siguientes' in pagination.get_text():
-                next_page_url = pagination.get('href')
-                if next_page_url:
-                    logger.info(f"Found pagination, fetching next page: {next_page_url}")
-                    # Ensure next_page_url is a string
-                    next_page_url = str(next_page_url)
-                    next_page_url = make_absolute_url(self.base_url, next_page_url)
-                    next_soup = self.fetch_and_parse(next_page_url)
-                    if next_soup:
-                        next_events = self._extract_events_from_page(next_soup)
-                        events.extend(next_events)
-                        logger.info(f"Added {len(next_events)} events from next page")
-
-            return events
-
+            # Use the base class pagination method
+            return self.process_pagination(
+                base_url=self.base_url,
+                start_url=self.url,
+                extract_page_events=self._extract_events_from_page,
+                next_page_selector='.pagination .page-link:contains("Siguientes")'
+            )
         except Exception as e:
-            logger.error(f"Error scraping Avilés events: {e}")
-            return []
+            return self.handle_error(e, "scraping Avilés events", [])
 
     def _extract_events_from_page(self, soup):
         """Extract events from the page content."""

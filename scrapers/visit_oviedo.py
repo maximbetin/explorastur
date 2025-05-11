@@ -22,44 +22,18 @@ class VisitOviedoScraper(EventScraper):
 
     def scrape(self):
         """Scrape events from Visit Oviedo website with pagination support."""
-        events = []
         logger.info(f"Fetching URL: {self.url}")
 
         try:
-            # Fetch the initial page
-            soup = self.fetch_and_parse(self.url)
-            if not soup:
-                return []
-
-            # Extract events from the current week view
-            events = self._extract_week_events(soup)
-            logger.info(f"Found {len(events)} events on initial page")
-
-            # Check for pagination to next week
-            next_week_link = soup.select_one('.paginator .pager li:last-child a')
-            if next_week_link and "Siguiente" in next_week_link.get_text():
-                next_url = next_week_link.get('href')
-                if next_url:
-                    # Make sure it's an absolute URL and properly cast to string
-                    next_url = str(next_url)
-                    if not next_url.startswith('http'):
-                        next_url = make_absolute_url(self.base_url, next_url)
-
-                    # Fetch the next week
-                    logger.info(f"Fetching next week: {next_url}")
-                    next_soup = self.fetch_and_parse(next_url)
-                    if next_soup:
-                        next_events = self._extract_week_events(next_soup)
-                        events.extend(next_events)
-                        logger.info(f"Added {len(next_events)} events from next week")
-
-            return events
-
+            # Use the base class pagination method
+            return self.process_pagination(
+                base_url=self.base_url,
+                start_url=self.url,
+                extract_page_events=self._extract_week_events,
+                next_page_selector='.paginator .pager li:last-child a:contains("Siguiente")'
+            )
         except Exception as e:
-            logger.error(f"Error scraping Visit Oviedo: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return []
+            return self.handle_error(e, "scraping Visit Oviedo events", [])
 
     def _extract_week_events(self, soup):
         """Extract events from a week view page."""
