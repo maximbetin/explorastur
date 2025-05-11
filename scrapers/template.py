@@ -1,112 +1,104 @@
 """
 Template for creating new scrapers.
 
-Use this file as a starting point when creating a new scraper.
-Copy this file to a new file with an appropriate name (e.g., new_source.py)
-and implement the scraper class following this template.
+This is a minimal skeleton template that should be copied to a new file
+when creating a new scraper. It contains only the essential structure
+that needs to be implemented for each scraper.
+
+Usage:
+1. Copy this file to a new file with an appropriate name (e.g., new_source.py)
+2. Rename the class to match your scraper (e.g., NewSourceScraper)
+3. Implement the required methods
+
+Do not modify this template directly - it's meant to be copied.
 """
 
 import logging
-import re
-from bs4 import BeautifulSoup, Tag
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 
 from scrapers.base import EventScraper
-from scraper_utils import make_absolute_url
 
 logger = logging.getLogger('explorastur')
 
 class TemplateScraper(EventScraper):
     """Template scraper class.
 
-    This is a template for creating new scraper classes.
+    This is a skeleton template for creating new scraper classes.
     Rename this class to match your scraper (e.g., NewSourceScraper).
     """
 
     def __init__(self, config=None):
         """Initialize the scraper.
 
+        The base class handles all the configuration.
+        You can add scraper-specific initialization here if needed.
+
         Args:
             config: Configuration dictionary for the scraper
         """
         super().__init__(config)
         # Add any scraper-specific initialization here
-        # No need to set url or source_name as they're handled by the base class
 
     def scrape(self) -> List[Dict[str, str]]:
         """Scrape events from the source.
 
+        This is the main method that should be implemented.
+        It should handle the following steps:
+        1. Fetch and parse the HTML from the source
+        2. Find event containers/elements
+        3. Extract data from each event
+        4. Create standardized event dictionaries
+        5. Return the list of events
+
         Returns:
-            List of event dictionaries
+            List of standardized event dictionaries
         """
         events = []
         logger.info(f"Fetching URL: {self.url}")
 
         try:
-            # Fetch and parse the HTML
+            # 1. Fetch and parse the HTML
             soup = self.fetch_and_parse(self.url)
             if not soup:
                 logger.error(f"Failed to fetch or parse URL: {self.url}")
                 return []
 
-            # Find event containers
-            # Replace this selector with the appropriate one for your target site
+            # 2. Find event containers
+            # TODO: Replace with appropriate selector for your target site
             event_containers = soup.select('.event-container')
             logger.info(f"Found {len(event_containers)} event containers")
 
-            # Process each event container
+            # 3. Process each event container
             for container in event_containers:
-                # Extract event data from the container
-                # Replace these selectors with appropriate ones for your target site
-                title_element = container.select_one('.event-title')
-                date_element = container.select_one('.event-date')
-                location_element = container.select_one('.event-location')
-                link_element = container.select_one('a')
+                # TODO: Implement event extraction logic here
+                # Extract title, date, location, URL, etc.
 
-                # Skip if required elements are missing
-                if not title_element or not date_element:
-                    continue
+                # 4. Create a standardized event dictionary
+                # event = self.create_event(
+                #     title="Event Title",
+                #     date="Event Date",
+                #     location="Event Location",
+                #     url="Event URL",
+                #     description="Optional description"
+                # )
 
-                # Extract text content
-                title = title_element.get_text().strip()
-                date = date_element.get_text().strip()
-                location = location_element.get_text().strip() if location_element else ""
-
-                # Extract URL
-                url = ""
-                if link_element and hasattr(link_element, 'get') and callable(link_element.get):
-                    href = link_element.get('href', '')
-                    # Handle the case where href is a list (some BS4 versions)
-                    if isinstance(href, list):
-                        href = href[0] if href else ""
-
-                    # Make URL absolute if it's relative
-                    if href and isinstance(href, str) and href.startswith(('http://', 'https://')):
-                        url = href
-                    elif href and isinstance(href, str):
-                        url = make_absolute_url(self.url, href)
-
-                # If no URL was found, use the main page URL
-                if not url:
-                    url = self.url
-
-                # Create event dictionary with safe string values
-                event = self.create_event(
-                    title=title,
-                    date=date,
-                    location=location,
-                    url=str(url),  # Ensure it's a string
-                    description="",  # Optional description
-                    source=self.source_name
-                )
-
-                events.append(event)
+                # events.append(event)
+                pass
 
             logger.info(f"Found {len(events)} events")
             return events
 
         except Exception as e:
-            logger.error(f"Error scraping {self.source_name}: {e}")
+            logger.error(f"Error scraping: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return []
+
+    # Add any additional helper methods needed for your specific scraper
+    # def _extract_date(self, element):
+    #     """Example helper method to extract date information."""
+    #     pass
+
+    # def _extract_location(self, element):
+    #     """Example helper method to extract location information."""
+    #     pass
