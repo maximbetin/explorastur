@@ -17,11 +17,19 @@ class AvilesEventsScraper(EventScraper):
     """Scraper for Avilés events."""
 
     def __init__(self, config=None):
-        super().__init__(config)
-        # No need for redundant configuration - handled by base class
+        """Initialize the scraper.
 
-    def scrape(self):
-        """Scrape events from Avilés website."""
+        Args:
+            config: Configuration dictionary for the scraper
+        """
+        super().__init__(config)
+
+    def scrape(self) -> List[Dict[str, str]]:
+        """Scrape events from Avilés website.
+
+        Returns:
+            List of standardized event dictionaries
+        """
         logger.info(f"Fetching URL: {self.url}")
 
         try:
@@ -35,8 +43,15 @@ class AvilesEventsScraper(EventScraper):
         except Exception as e:
             return self.handle_error(e, "scraping Avilés events", [])
 
-    def _extract_events_from_page(self, soup):
-        """Extract events from the page content."""
+    def _extract_events_from_page(self, soup) -> List[Dict[str, str]]:
+        """Extract events from the page content.
+
+        Args:
+            soup: BeautifulSoup object of the page
+
+        Returns:
+            List of event dictionaries
+        """
         events = []
 
         # Find all event cards - new structure uses .card.border-info
@@ -47,14 +62,26 @@ class AvilesEventsScraper(EventScraper):
 
         # Process each card
         for card in event_cards:
-            event = self._extract_event_from_card(card)
-            if event:
-                events.append(event)
+            try:
+                event = self._extract_event_from_card(card)
+                if event:
+                    events.append(event)
+            except Exception as e:
+                logger.error(f"Error extracting event from card: {e}")
+                # Continue with the next event instead of failing completely
 
+        logger.info(f"Found {len(events)} events from Avilés")
         return events
 
-    def _extract_event_from_card(self, card):
-        """Extract event details from a card element."""
+    def _extract_event_from_card(self, card) -> Optional[Dict[str, str]]:
+        """Extract event details from a card element.
+
+        Args:
+            card: BeautifulSoup element containing event data
+
+        Returns:
+            Event dictionary or None if extraction failed
+        """
         try:
             # Extract event title
             title_element = card.select_one('h5')
@@ -98,8 +125,15 @@ class AvilesEventsScraper(EventScraper):
             logger.error(f"Error extracting event from card: {e}")
             return None
 
-    def _extract_date_info(self, card):
-        """Extract and format date information from the card."""
+    def _extract_date_info(self, card) -> str:
+        """Extract and format date information from the card.
+
+        Args:
+            card: BeautifulSoup element containing date information
+
+        Returns:
+            Formatted date string
+        """
         try:
             # Check for date badges in the card
             date_badges = card.select('.badge.badge-secondary')
@@ -188,48 +222,70 @@ class AvilesEventsScraper(EventScraper):
             logger.error(f"Error extracting date info: {e}")
             return f"Todo el mes de {self.date_processor.get_current_month_name()}"
 
-    def _extract_location(self, card, title):
-        """Extract location information from the card or title."""
-        # Try to find location in the card text
-        card_text_div = card.select_one('.card-text')
-        if not card_text_div:
-            # If no card text, try to extract from title or return default
+    def _extract_location(self, card, title) -> str:
+        """Extract location information from the card or title.
+
+        Args:
+            card: BeautifulSoup element containing location information
+            title: Event title string
+
+        Returns:
+            Location string
+        """
+        try:
+            # Try to find location in the card text
+            card_text_div = card.select_one('.card-text')
+            if not card_text_div:
+                # If no card text, try to extract from title or return default
+                title_location = self.text_processor.extract_location_from_title(title)
+                return title_location if title_location else "Avilés"
+
+            card_text = card_text_div.get_text().strip()
+
+            # Look for location patterns
+            location_patterns = [
+                # "Lugar: Teatro Palacio Valdés"
+                re.search(r'lugar:?\s+([^\.]+)', card_text, re.IGNORECASE),
+                # "en el Teatro Palacio Valdés"
+                re.search(r'en\s+(?:el|la|los|las)\s+([^\.]+)', card_text, re.IGNORECASE),
+                # "en Teatro Palacio Valdés"
+                re.search(r'en\s+([^\.]+)', card_text, re.IGNORECASE)
+            ]
+
+            for pattern in location_patterns:
+                if pattern:
+                    location = pattern.group(1).strip()
+                    # Clean up the location if needed
+                    location = re.sub(r'^\s*y\s+', '', location)
+                    return location
+
+            # If no location pattern found, try to extract from title
             title_location = self.text_processor.extract_location_from_title(title)
-            return title_location if title_location else "Avilés"
+            if title_location:
+                return title_location
 
-        card_text = card_text_div.get_text().strip()
+            # Default location is Avilés
+            return "Avilés"
 
-        # Common location patterns
-        location_patterns = [
-            # "Lugar: Centro Niemeyer"
-            re.search(r'lugar:?\s*([^.,\n]+)', card_text, re.IGNORECASE),
-            # Venue keywords
-            re.search(r'((?:Teatro|Auditorio|Centro|Sala|Pabellón|Plaza|Factoría|Museo|Recinto|Niemeyer)\s+[^.,\n]+)', card_text),
-            # "en el/la ..." patterns
-            re.search(r'en\s+(?:el|la|los|las)?\s+([^.,\n]+)', card_text, re.IGNORECASE)
+        except Exception as e:
+            logger.error(f"Error extracting location: {e}")
+            return "Avilés"
+
+    def _get_spanish_month(self, month_num) -> str:
+        """Convert month number to Spanish month name.
+
+        Args:
+            month_num: Month number (1-12)
+
+        Returns:
+            Spanish month name
+        """
+        spanish_months = [
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
         ]
 
-        for pattern in location_patterns:
-            if pattern:
-                location = pattern.group(1) if 'lugar' in pattern.group(0).lower() else pattern.group(0)
-                # Clean up location
-                location = re.sub(r'^lugar:?\s*', '', location, flags=re.IGNORECASE)
-                location = re.sub(r'^en\s+(?:el|la|los|las)?\s+', '', location, flags=re.IGNORECASE)
-                return location.strip()
-
-        # If no location found in card, try to extract it from the title
-        title_location = self.text_processor.extract_location_from_title(title)
-        if title_location:
-            return title_location
-
-        # If still no location, assume it's in Avilés
-        return "Avilés"
-
-    def _get_spanish_month(self, month_num):
-        """Convert month number to Spanish month name."""
-        months = {
-            1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
-            5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
-            9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
-        }
-        return months.get(month_num, "")
+        if 1 <= month_num <= 12:
+            return spanish_months[month_num - 1]
+        else:
+            return ""

@@ -250,46 +250,169 @@ class EventScraper:
         while current_page <= pages_to_fetch:
             logger.info(f"Fetching page {current_page}: {current_url}")
 
-            try:
-                soup = self.fetch_and_parse(current_url)
-                if not soup:
-                    break
+            # Fetch and parse the page
+            soup = self.fetch_and_parse(current_url)
+            if not soup:
+                logger.error(f"Failed to fetch or parse page {current_page}: {current_url}")
+                break
 
-                # Extract events from the current page
-                page_events = extract_page_events(soup)
-                all_events.extend(page_events)
+            # Extract events from this page
+            page_events = extract_page_events(soup)
+            all_events.extend(page_events)
+            logger.info(f"Found {len(page_events)} events on page {current_page}")
 
-                logger.info(f"Extracted {len(page_events)} events from page {current_page}")
+            # Check if we should continue to the next page
+            if current_page >= pages_to_fetch:
+                break
 
-                # If no next page selector provided, stop after first page
-                if not next_page_selector:
-                    break
+            # Find the next page link
+            if not next_page_selector:
+                break
 
-                # Find the next page link
-                next_link = soup.select_one(next_page_selector)
-                if not next_link:
-                    logger.info("No next page link found")
-                    break
+            next_link = soup.select_one(next_page_selector)
+            if not next_link:
+                logger.info(f"No next page link found on page {current_page}")
+                break
 
-                # Check if next link is disabled
-                classes = next_link.get('class', [])
-                if classes and 'disabled' in classes:
-                    logger.info("Next page link is disabled")
-                    break
+            # Get the next page URL - handle potential None or list values
+            href = next_link.get('href')
+            if not href:
+                logger.info(f"No href attribute found in next link on page {current_page}")
+                break
 
-                # Get the URL for the next page
-                next_url = next_link.get('href', '')
-                if not next_url:
-                    logger.info("No next page URL found")
-                    break
+            # Convert href to string if it's a list (sometimes BeautifulSoup returns attributes as lists)
+            next_url = href[0] if isinstance(href, list) else href
 
-                # Make the URL absolute if it's relative
-                if isinstance(next_url, list):
-                    next_url = next_url[0] if next_url else ""
-                current_url = make_absolute_url(base_url, next_url)
-                current_page += 1
+            # Ensure next_url is a string
+            next_url = str(next_url)
 
-            except Exception as e:
-                return self.handle_error(e, f"processing page {current_page}", all_events)
+            # Make absolute URL if it's relative
+            if not next_url.startswith(('http://', 'https://')):
+                next_url = make_absolute_url(base_url, next_url)
 
+            # Update for the next iteration
+            current_url = next_url
+            current_page += 1
+
+        logger.info(f"Finished pagination, found {len(all_events)} events in total")
         return all_events
+
+    def clean_date_text(self, date_text: str) -> str:
+        """Clean and format date text.
+
+        Common method to handle various date formats consistently.
+
+        Args:
+            date_text: The raw date text to clean
+
+        Returns:
+            Cleaned date string
+        """
+        if not date_text:
+            return ""
+
+        # Remove any HTML tags that might be present
+        date_text = re.sub(r'<[^>]+>', '', date_text)
+
+        # Remove common prefixes
+        prefixes = ['fecha:', 'fecha', 'desde el', 'desde', 'a partir del']
+        for prefix in prefixes:
+            if date_text.lower().startswith(prefix):
+                date_text = date_text[len(prefix):].strip()
+
+        # Handle different date formats
+
+        # Format: "Del 23 al 27 de mayo"
+        del_al_match = re.search(r'del\s+(\d{1,2})\s+al\s+(\d{1,2})\s+de\s+([a-zA-Z]+)', date_text, re.IGNORECASE)
+        if del_al_match:
+            start_day = del_al_match.group(1)
+            end_day = del_al_match.group(2)
+            month = del_al_match.group(3)
+            return f"{start_day} - {end_day} de {month.lower()}"
+
+        # Format: "23 - 27 mayo" or "23-27 mayo"
+        range_match = re.search(r'(\d{1,2})\s*[-\/]\s*(\d{1,2})\s+(?:de\s+)?([a-zA-Z]+)', date_text, re.IGNORECASE)
+        if range_match:
+            start_day = range_match.group(1)
+            end_day = range_match.group(2)
+            month = range_match.group(3)
+            return f"{start_day} - {end_day} de {month.lower()}"
+
+        # Format: "23 de mayo"
+        single_day_match = re.search(r'(\d{1,2})\s+(?:de\s+)?([a-zA-Z]+)', date_text, re.IGNORECASE)
+        if single_day_match:
+            day = single_day_match.group(1)
+            month = single_day_match.group(2)
+            return f"{day} de {month.lower()}"
+
+        # Format: "Mayo 2023" (whole month)
+        month_year_match = re.search(r'([a-zA-Z]+)\s+\d{4}', date_text, re.IGNORECASE)
+        if month_year_match:
+            month = month_year_match.group(1)
+            return f"Todo el mes de {month.lower()}"
+
+        # If no patterns match, just clean up the text
+        clean_text = date_text.strip()
+        if clean_text:
+            return clean_text
+
+        # If nothing works, return empty string
+        return ""
+
+    def extract_location_from_text(self, text: str, default_location: str = "") -> str:
+        """Extract location from text content.
+
+        Searches for common location patterns in text.
+
+        Args:
+            text: Text to search for location
+            default_location: Default location to return if none found
+
+        Returns:
+            Extracted location or default location
+        """
+        if not text:
+            return default_location
+
+        # Look for location patterns
+        location_patterns = [
+            # "Lugar: Teatro Palacio Valdés"
+            re.search(r'lugar:?\s+([^\.]+)', text, re.IGNORECASE),
+            # "en el Teatro Palacio Valdés"
+            re.search(r'en\s+(?:el|la|los|las)\s+([^\.]+)', text, re.IGNORECASE),
+            # "Localización: Centro Niemeyer"
+            re.search(r'localizaci[óo]n:?\s+([^\.]+)', text, re.IGNORECASE),
+            # "ubicado en Centro Niemeyer"
+            re.search(r'ubicado\s+en\s+([^\.]+)', text, re.IGNORECASE),
+        ]
+
+        for pattern in location_patterns:
+            if pattern:
+                location = pattern.group(1).strip()
+                if location:
+                    return location
+
+        # Check if we can extract from title as fallback
+        title_location = self.text_processor.extract_location_from_title(text)
+        if title_location:
+            return title_location
+
+        return default_location
+
+    def get_spanish_month(self, month_num: int) -> str:
+        """Get Spanish month name from number.
+
+        Args:
+            month_num: Month number (1-12)
+
+        Returns:
+            Spanish name of the month
+        """
+        months = [
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+        ]
+
+        if 1 <= month_num <= 12:
+            return months[month_num - 1]
+        return ""

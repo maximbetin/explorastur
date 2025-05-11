@@ -4,9 +4,8 @@ Scraper for Visit Oviedo website.
 
 import logging
 import re
-import json
-from bs4 import BeautifulSoup
-from typing import Dict, List, Optional, Any
+from bs4 import BeautifulSoup, Tag
+from typing import Dict, List, Optional, Any, cast
 
 from scrapers.base import EventScraper
 from scraper_utils import make_absolute_url
@@ -17,11 +16,19 @@ class VisitOviedoScraper(EventScraper):
     """Scraper for Visit Oviedo website."""
 
     def __init__(self, config=None):
-        super().__init__(config)
-        # No need for custom URL or source_name as they're handled by the base class
+        """Initialize the scraper.
 
-    def scrape(self):
-        """Scrape events from Visit Oviedo website with pagination support."""
+        Args:
+            config: Configuration dictionary for the scraper
+        """
+        super().__init__(config)
+
+    def scrape(self) -> List[Dict[str, str]]:
+        """Scrape events from Visit Oviedo website with pagination support.
+
+        Returns:
+            List of standardized event dictionaries
+        """
         logger.info(f"Fetching URL: {self.url}")
 
         try:
@@ -35,8 +42,15 @@ class VisitOviedoScraper(EventScraper):
         except Exception as e:
             return self.handle_error(e, "scraping Visit Oviedo events", [])
 
-    def _extract_week_events(self, soup):
-        """Extract events from a week view page."""
+    def _extract_week_events(self, soup: BeautifulSoup) -> List[Dict[str, str]]:
+        """Extract events from a week view page.
+
+        Args:
+            soup: BeautifulSoup object of the page
+
+        Returns:
+            List of event dictionaries
+        """
         events = []
 
         # Find the week-view container
@@ -58,8 +72,15 @@ class VisitOviedoScraper(EventScraper):
 
         return events
 
-    def _process_day(self, day_entry):
-        """Process a single day entry and extract all events."""
+    def _process_day(self, day_entry: Tag) -> List[Dict[str, str]]:
+        """Process a single day entry and extract all events.
+
+        Args:
+            day_entry: BeautifulSoup element containing a day's events
+
+        Returns:
+            List of event dictionaries
+        """
         events = []
 
         try:
@@ -96,8 +117,16 @@ class VisitOviedoScraper(EventScraper):
             logger.error(f"Error processing day entry: {e}")
             return []
 
-    def _extract_event_from_entry(self, entry, day_date):
-        """Extract event details from an entry element."""
+    def _extract_event_from_entry(self, entry: Tag, day_date: str) -> Optional[Dict[str, str]]:
+        """Extract event details from an entry element.
+
+        Args:
+            entry: BeautifulSoup element containing event data
+            day_date: Date string for the day this event occurs
+
+        Returns:
+            Event dictionary or None if extraction failed
+        """
         try:
             # Extract link
             link = entry.select_one('a')
@@ -105,23 +134,30 @@ class VisitOviedoScraper(EventScraper):
                 return None
 
             # Extract URL
-            event_url = link.get('href', '')
-            # Ensure event_url is a string
-            event_url = str(event_url)
-            if not event_url.startswith('http'):
+            event_url = ""
+            href = link.get('href')
+            if href:
+                # Convert href to string if it's a list
+                event_url = href[0] if isinstance(href, list) else href
+                event_url = str(event_url)
+
+            # Make URL absolute if it's relative
+            if event_url and not event_url.startswith(('http://', 'https://')):
                 event_url = make_absolute_url(self.base_url, event_url)
 
             # First try to get title from link title attribute as this may be cleaner
-            link_title = link.get('title', '')
+            title = ""
+            link_title = link.get('title')
             if link_title:
+                # Handle different types that might be returned
+                if isinstance(link_title, list):
+                    link_title = link_title[0] if link_title else ""
                 # Remove "Ver evento " prefix from title
-                title = re.sub(r'^Ver evento\s+', '', link_title)
+                title = re.sub(r'^Ver evento\s+', '', str(link_title))
                 # Fix broken title attribute in links like "Segunda semifinal Concurso... ciudad="" de="" oviedo"
                 title = re.sub(r'\s+ciudad=""', ' Ciudad', title)
                 title = re.sub(r'\s+de=""', ' de', title)
                 title = re.sub(r'\s+oviedo""="">', ' Oviedo', title)
-            else:
-                title = ""
 
             # If no title from link attribute or it's malformed, try from the .title element
             if not title or '""=""' in title:
@@ -165,6 +201,10 @@ class VisitOviedoScraper(EventScraper):
                 # Extract the location, removing the icon text
                 location_text = location_element.get_text().strip()
                 location = re.sub(r'^marker', '', location_text).strip()
+
+            # If no location found, use default
+            if not location:
+                location = "Oviedo"
 
             # Combine date and time
             event_date = day_date
