@@ -1,6 +1,6 @@
 # ExplorAstur
 
-ExplorAstur is a minimal web scraper that finds events happening in Asturias, Spain from the Telecable blog and outputs them to a markdown file.
+ExplorAstur is a minimal web scraper that finds events happening in Asturias, Spain from multiple sources and outputs them to a markdown file.
 
 ## Setup
 
@@ -25,10 +25,42 @@ ExplorAstur is a minimal web scraper that finds events happening in Asturias, Sp
 ## How It Works
 
 The tool is extremely simple:
-1. Fetches content from the Telecable blog
-2. Parses events from HTML content
-3. Organizes them into a chronological list in a markdown file
-4. Each source is presented under its own header
+1. Fetches content from multiple event sources
+2. Handles pagination to collect all available events
+3. Parses events from HTML content
+4. Organizes them into a chronological list in a markdown file
+5. Each source is presented under its own header
+
+## Current Event Sources
+
+- **[Telecable Blog](https://blog.telecable.es/agenda-planes-asturias/)**: A monthly article with event listings
+- **[Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)**: The official tourism website for Asturias with pagination support
+
+## Features
+
+### Pagination Support
+
+The Turismo Asturias scraper now supports pagination, allowing it to:
+- Automatically detect the total number of pages
+- Navigate through all result pages (configurable max limit)
+- Collect events from every page
+- Handle pagination parameters in URLs
+
+### Clean Date Formatting
+
+The system displays dates in a clean, human-friendly format:
+- No leading zeros (e.g., "1 mayo" instead of "01 mayo")
+- No years (e.g., "1 mayo" instead of "1 mayo 2025")
+- Clean range formatting (e.g., "9 mayo - 18 mayo")
+
+### Concise Event Format
+
+Events are displayed in a concise format that includes only essential information:
+- Event title
+- Event date
+- Location (when available)
+- Link to the event page
+- No descriptions, keeping the output clean and easy to scan
 
 ## Date and Month Handling
 
@@ -43,22 +75,24 @@ This means the scraper will continue to work correctly throughout the year witho
 
 ## Output Format
 
-Events are presented in a single chronological list with the following format:
+Events are grouped by source and presented chronologically, with the following format:
 
 ```
 # Eventos en Asturias
 
 _Actualizado: 11/05/2025_
 
-## [Blog Telecable](https://blog.telecable.es/agenda-planes-asturias/)
+## [Telecable](https://blog.telecable.es/agenda-planes-asturias/)
 
-**Durante todo el mes de mayo**: "Estaciones interiores"
+**Durante todo el mes de mayo**: Estaciones interiores
    - Lugar: Museo de Bellas Artes de Asturias (Oviedo)
    - Link: https://www.museobbaa.com/exposicion/covadonda-valdes-more-estaciones-interiores/
 
-**11 de mayo**: "Querencia"
-   - Lugar: Teatro Palacio Valdés de Avilés
-   - Link: https://antonionajarro.com/querencia/
+## [Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)
+
+**9 mayo - 18 mayo**: Jornadas Gastronómicas de la Llámpara. Villaviciosa
+   - Lugar: Quintes y Quintueles
+   - Link: https://www.turismoasturias.es/agenda-de-asturias/-/calendarsuite/event/...
 ```
 
 ## Project Structure
@@ -94,12 +128,14 @@ explorastur/
 - Contains scraper implementations
 - Base class `EventScraper`: Defines interface for all scrapers
 - `TelecableScraper`: Implementation for Telecable blog
+- `TurismoAsturiaScraper`: Implementation for Turismo Asturias website with pagination support
 - Each scraper is responsible for obtaining raw event data
 
 ### processor.py
 - `EventProcessor`: Processes raw events
   - Filters out past events
   - Cleans and enhances data (extracting locations, fixing formatting)
+  - Groups events by source
   - Formats events to markdown output in chronological order
 
 ## Data Flow
@@ -144,7 +180,7 @@ The codebase follows these design principles:
 - [Centros Sociales](https://www.oviedo.es/centrossociales/avisos)
 - [Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
 - [Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
-- [Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)
+- ~~[Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)~~ (Implemented)
 
 ## License
 

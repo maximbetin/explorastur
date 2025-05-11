@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-ExplorAstur - Simple Telecable event scraper for Asturias
+ExplorAstur - Simple event scraper for Asturias tourism websites
 ---------------------------------------------------------
-Main script that runs the scraper and outputs events to a markdown file.
+Main script that runs the scrapers and outputs events to a markdown file.
 """
 
 import os
 import datetime
 import logging
 import sys
-from scrapers import TelecableScraper
+from scrapers import TelecableScraper, TurismoAsturiaScraper
 from processor import EventProcessor
 
 # Create directories
@@ -39,24 +39,37 @@ if not logger.handlers:
 
 def main():
     """Main execution function."""
-    logger.info("Starting ExplorAstur - Telecable events scraper")
+    logger.info("Starting ExplorAstur - Event scrapers")
+    all_events = []
 
     try:
-        # Create scraper
-        scraper = TelecableScraper()
+        # Create scrapers
+        scrapers = [
+            ('Telecable', TelecableScraper()),
+            ('Turismo Asturias', TurismoAsturiaScraper())
+        ]
 
-        # Scrape events
-        events = scraper.scrape()
+        # Run each scraper
+        for name, scraper in scrapers:
+            logger.info(f"Running {name} scraper")
+            events = scraper.scrape()
 
-        if not events:
-            logger.warning("No events found")
+            if not events:
+                logger.warning(f"No events found from {name}")
+                continue
+
+            logger.info(f"Found {len(events)} events from {name}")
+            all_events.extend(events)
+
+        if not all_events:
+            logger.warning("No events found from any source")
             return
 
-        logger.info(f"Found {len(events)} events")
+        logger.info(f"Total events collected: {len(all_events)}")
 
         # Process events
         processor = EventProcessor()
-        filtered_events = processor.process_events(events)
+        filtered_events = processor.process_events(all_events)
 
         # Format to markdown
         markdown = processor.format_to_markdown(filtered_events)
@@ -71,7 +84,7 @@ def main():
         logger.info("ExplorAstur completed successfully")
 
     except Exception as e:
-        logger.error(f"Error running scraper: {e}")
+        logger.error(f"Error running scrapers: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

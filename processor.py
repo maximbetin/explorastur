@@ -43,19 +43,9 @@ class EventProcessor:
 
             # Check if the event is in the future
             if self.date_processor.is_future_event(event['date'], current_date):
-                # Fix incomplete descriptions
-                if not event['description'] and event['title']:
-                    event['description'] = self.text_processor.fix_incomplete_description(
-                        event['title'], event['description']
-                    )
-
                 # Get location from title if missing
                 if not event['location'] and event['title']:
                     event['location'] = self.text_processor.extract_location_from_title(event['title'])
-
-                # If location is still missing, try to extract from description
-                if not event['location'] and event['description']:
-                    event['location'] = self._extract_location_from_description(event['description'])
 
                 # Clean up the location field
                 if event['location']:
@@ -69,21 +59,6 @@ class EventProcessor:
         )
 
         return filtered_events
-
-    def _extract_location_from_description(self, description):
-        """Extract location information from the description"""
-        # Common venue patterns in descriptions
-        venue_patterns = [
-            r'en (?:el|la|los|las)?\s+((?:Teatro|Auditorio|Centro|Sala|Pabellón|Plaza|Factoría|Museo)[^\.]+)',
-            r'en (?:el|la|los|las)?\s+((?:Gijón|Oviedo|Avilés)[^\.]+)',
-        ]
-
-        for pattern in venue_patterns:
-            match = re.search(pattern, description)
-            if match:
-                return match.group(1).strip()
-
-        return ""
 
     def _clean_location(self, location):
         """Clean up location text to extract just the venue and city"""
@@ -138,8 +113,8 @@ class EventProcessor:
 
     def format_to_markdown(self, events):
         """
-        Format the events list to a markdown file with all events in a single list.
-        Events with the same date (such as "Durante todo el mes de mayo") will be grouped together.
+        Format the events list to a markdown file with events grouped by source.
+        Events with the same date will be grouped together within each source.
         """
         if not events:
             return "# No events found"
@@ -148,53 +123,87 @@ class EventProcessor:
         markdown = "# Eventos en Asturias\n\n"
         markdown += f"_Actualizado: {datetime.datetime.now().strftime('%d/%m/%Y')}_\n\n"
 
-        # Add source link as a header
-        markdown += "## [Blog Telecable](https://blog.telecable.es/agenda-planes-asturias/)\n\n"
-
-        # Sort all events by date
-        events.sort(key=lambda x: self.date_processor.date_sort_key(x['date']))
-
-        # Group events by date
-        events_by_date = {}
+        # Group events by their source URL
+        events_by_source = {}
         for event in events:
-            date = event['date']
-            if date not in events_by_date:
-                events_by_date[date] = []
-            events_by_date[date].append(event)
+            source = None
+            url = event['url']
 
-        # Add all events grouped by date
-        for date, date_events in events_by_date.items():
-            # Add the date as a header
-            markdown += f"**{date}**:\n"
+            # Determine source based on URL
+            if 'blog.telecable.es' in url:
+                source = 'Telecable'
+            elif 'turismoasturias.es' in url:
+                source = 'Turismo Asturias'
+            else:
+                source = 'Otros eventos'
 
-            # Add each event under this date
-            for event in date_events:
-                # Clean up the title - remove any quotes
-                title = event['title']
-                if title.startswith('"') and title.endswith('"'):
-                    title = title[1:-1]
-                elif title.startswith('"'):
-                    title = title[1:]
-                elif title.endswith('"'):
-                    title = title[:-1]
-                # Remove any remaining quotes anywhere in the title
-                title = title.replace('"', '')
+            if source not in events_by_source:
+                events_by_source[source] = []
 
-                # Add the event title without quotes
-                markdown += f"   - {title}\n"
+            events_by_source[source].append(event)
 
-                # Add location if available and not just "Asturias" - use "Lugar" in Spanish
-                if event['location'] and event['location'].lower() != 'asturias':
-                    markdown += f"     - Lugar: {event['location']}\n"
+        # Add source links as headers
+        source_urls = {
+            'Telecable': 'https://blog.telecable.es/agenda-planes-asturias/',
+            'Turismo Asturias': 'https://www.turismoasturias.es/agenda-de-asturias'
+        }
 
-                # Add URL if available
-                if event['url']:
-                    markdown += f"     - Link: {event['url']}\n"
+        # Sort sources to ensure consistent order
+        for source in sorted(events_by_source.keys()):
+            source_events = events_by_source[source]
 
-                # Add a small gap between events with the same date
+            # Sort all events by date
+            source_events.sort(key=lambda x: self.date_processor.date_sort_key(x['date']))
+
+            # Add source heading and link
+            if source in source_urls:
+                markdown += f"## [{source}]({source_urls[source]})\n\n"
+            else:
+                markdown += f"## {source}\n\n"
+
+            # Group events by date
+            events_by_date = {}
+            for event in source_events:
+                date = event['date']
+                if date not in events_by_date:
+                    events_by_date[date] = []
+                events_by_date[date].append(event)
+
+            # Add events grouped by date for this source
+            for date, date_events in events_by_date.items():
+                # Add the date as a header
+                markdown += f"**{date}**:\n"
+
+                # Add each event under this date
+                for event in date_events:
+                    # Clean up the title - remove any quotes
+                    title = event['title']
+                    if title.startswith('"') and title.endswith('"'):
+                        title = title[1:-1]
+                    elif title.startswith('"'):
+                        title = title[1:]
+                    elif title.endswith('"'):
+                        title = title[:-1]
+                    # Remove any remaining quotes anywhere in the title
+                    title = title.replace('"', '')
+
+                    # Add the event title without quotes
+                    markdown += f"   - {title}\n"
+
+                    # Add location if available and not just "Asturias" - use "Lugar" in Spanish
+                    if event['location'] and event['location'].lower() != 'asturias':
+                        markdown += f"     - Lugar: {event['location']}\n"
+
+                    # Add URL if available
+                    if event['url']:
+                        markdown += f"     - Link: {event['url']}\n"
+
+                    # No longer including descriptions
+
+                    # Add a small gap between events with the same date
+                    markdown += "\n"
+
+                # Add an extra line break between different dates
                 markdown += "\n"
-
-            # Add an extra line break between different dates
-            markdown += "\n"
 
         return markdown

@@ -10,14 +10,14 @@ class DateProcessor:
 
     @staticmethod
     def get_current_month_year():
-        """Get the current month name in Spanish and year."""
+        """Get the current month name in Spanish."""
         months = {
             1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
             5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
             9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
         }
         now = datetime.datetime.now()
-        return f"{months[now.month]} {now.year}"
+        return f"{months[now.month]}"
 
     @staticmethod
     def get_current_month_name():
@@ -157,42 +157,6 @@ class TextProcessor:
     """Class to handle text cleaning and processing."""
 
     @staticmethod
-    def clean_description(text):
-        """Clean up description text by removing common prefixes, dates, and urls."""
-        if not text:
-            return ""
-
-        # Remove URLs
-        text = re.sub(r'https?://\S+', '', text)
-
-        # Remove dates at the beginning
-        text = re.sub(r'^(\d+(?:\s+[ay]\s+\d+)?\s+de\s+[a-zA-Z]+:?)', '', text)
-        text = re.sub(r'^(\d+-\d+(?:\s+[ay]\s+\d+-\d+)?\s+de\s+[a-zA-Z]+:?)', '', text)
-
-        # Remove common prefixes
-        prefixes = ["el día", "los días", "el viernes", "el sábado", "el domingo",
-                   "el lunes", "el martes", "el miércoles", "el jueves"]
-        for prefix in prefixes:
-            if text.lower().startswith(prefix):
-                text = text[len(prefix):].strip()
-
-        # Clean up any leftover punctuation at the beginning
-        text = text.lstrip('.:,;- ')
-
-        # Fix missing spaces after punctuation
-        text = re.sub(r'([a-zA-Z])\.([A-Z])', r'\1. \2', text)
-        text = re.sub(r'([a-zA-Z]),([A-Z])', r'\1, \2', text)
-
-        # Fix missing spaces around names
-        text = re.sub(r'([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])', r'\1 \2', text)
-
-        # Capitalize first letter if needed
-        if text and len(text) > 1:
-            text = text[0].upper() + text[1:]
-
-        return text
-
-    @staticmethod
     def clean_title(title, date_pattern=None):
         """Clean up event title, removing date patterns and fixing formatting issues."""
         if not title:
@@ -286,31 +250,3 @@ class TextProcessor:
         ]
 
         return any(re.search(pattern, title.lower()) for pattern in non_event_patterns)
-
-    @staticmethod
-    def fix_incomplete_description(title, description):
-        """Fix known incomplete descriptions or truncated text."""
-        known_fixes = {
-            "Jornadas Gastronómicas de la Llámpara,Villaviciosa":
-                "9 a 18 de mayo: Jornadas Gastronómicas de la Llámpara en Villaviciosa",
-            "San Isidro en Llanera":
-                "10-11 y 16-18 de mayo: San Isidro en Llanera",
-            "Semana de la Floración del Manzano en la Comarca de la Sidra":
-                "1 a 4 de mayo: Semana de la Floración del Manzano en la Comarca de la Sidra",
-            "Preba de la sidra de Gascona":
-                "Celebración de la sidra asturiana en la calle Gascona de Oviedo"
-        }
-
-        # Apply known fixes
-        if title in known_fixes and (not description or description.endswith(('a', '-'))):
-            return known_fixes[title]
-
-        # Fix truncated descriptions
-        if description and (description.endswith('a') or description.endswith('-')):
-            # Try to intelligently expand common truncations
-            if description.endswith('a') and title.find("Llámpara") >= 0:
-                return "9 a 18 de mayo: Jornadas Gastronómicas de la Llámpara en Villaviciosa"
-            elif description.endswith('-') and title.find("San Isidro") >= 0:
-                return "10-11 y 16-18 de mayo: San Isidro en Llanera"
-
-        return description

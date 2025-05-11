@@ -172,11 +172,14 @@ class TelecableScraper(EventScraper):
         date_match = re.search(r'([\d\s\w\-]+(?:de \w+|\w+ \d{4}))', title)
 
         # Default date fallback uses current month/year
-        date = date_match.group(1).strip() if date_match else f"{current_month.capitalize()} {current_year}"
+        date = date_match.group(1).strip() if date_match else f"{current_month.capitalize()}"
 
         # For "todo el mes" or "Durante todo el mes" cases, add current month
         if "todo el mes" in title.lower() and not re.search(r'\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b', title.lower()):
             date = f"Durante todo el mes de {current_month}"
+
+        # Clean up the date to remove leading zeros and year
+        date = self._clean_date_format(date)
 
         # Extract link from the paragraph following the title
         url = ""
@@ -276,3 +279,219 @@ class TelecableScraper(EventScraper):
             )
 
         return None
+
+    def _clean_date_format(self, date_text):
+        """Clean date text to remove leading zeros and year."""
+        if not date_text:
+            return date_text
+
+        # Remove year patterns (e.g., "2025", " 2025")
+        date_text = re.sub(r'\s*\d{4}', '', date_text)
+
+        # Replace leading zeros in day numbers
+        # Match patterns like "01 de mayo", "02-03 de mayo", etc.
+        date_text = re.sub(r'\b0(\d)(\s+de|\s*[-\/])', r'\1\2', date_text)
+
+        return date_text.strip()
+
+class TurismoAsturiaScraper(EventScraper):
+    """Scraper for Turismo Asturias events page."""
+
+    def __init__(self):
+        super().__init__()
+        self.base_url = "https://www.turismoasturias.es"
+        self.url = f"{self.base_url}/agenda-de-asturias"
+        self.max_pages = 5  # Maximum number of pages to scrape to avoid excessive requests
+
+    def scrape(self):
+        """Scrape events from Turismo Asturias website with pagination support."""
+        all_events = []
+        current_page = 1
+        pages_processed = 0
+
+        logger.info(f"Starting pagination scrape of Turismo Asturias (max {self.max_pages} pages)")
+
+        while current_page <= self.max_pages:
+            # Construct URL with pagination parameters if not on first page
+            if current_page == 1:
+                current_url = self.url
+            else:
+                # Construct pagination URL with the proper parameters for page number
+                current_url = (f"{self.url}?p_p_id=as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0"
+                               f"&p_p_lifecycle=0"
+                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_calendarPath=%2Fhtml%2Fsuite%2Fdisplays%2Flist.jsp"
+                               f"&p_r_p_startDate=&p_r_p_endDate=&p_r_p_searchText=&p_r_p_categoryId=0&p_r_p_categoryIds="
+                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_calendarId=0"
+                               f"&p_r_p_tag=&p_r_p_time="
+                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_delta=12"
+                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_cur={current_page}")
+
+            logger.info(f"Fetching page {current_page}: {current_url}")
+
+            try:
+                # Fetch the current page
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                response = requests.get(current_url, headers=headers, timeout=30)
+                response.raise_for_status()
+                html = response.text
+
+                # Parse the page
+                soup = BeautifulSoup(html, 'html.parser')
+                event_cards = soup.select('div.card[itemscope][itemtype="http://schema.org/Event"]')
+
+                if not event_cards:
+                    logger.warning(f"No event cards found on page {current_page}")
+                    break
+
+                logger.info(f"Found {len(event_cards)} event cards on page {current_page}")
+                pages_processed += 1  # Increment pages processed counter
+
+                # Process each event card
+                page_events = []
+                for card in event_cards:
+                    try:
+                        event = self._extract_event_from_card(card)
+                        if event:
+                            page_events.append(event)
+                    except Exception as e:
+                        logger.error(f"Error processing event card: {e}")
+                        continue
+
+                # Add this page's events to the total
+                all_events.extend(page_events)
+                logger.info(f"Extracted {len(page_events)} events from page {current_page}")
+
+                # Check if there are more pages
+                # Look for a "disabled" last page link which indicates we're on the last page
+                last_page_links = soup.select('li.last.disabled')
+                if last_page_links:
+                    logger.info("Reached last page of results")
+                    break
+
+                # Check for pagination information to find total pages
+                pagination_info = soup.select_one('small.search-results')
+                if pagination_info:
+                    info_text = pagination_info.get_text().strip()
+                    # Extract total results count if available
+                    # Search for pattern like "Mostrando el intervalo 1 - 12 de 16 resultados."
+                    total_match = re.search(r'de\s+(\d+)\s+resultados', info_text, re.IGNORECASE)
+                    if total_match:
+                        total_results = int(total_match.group(1))
+                        results_per_page = 12  # Default results per page
+                        total_pages = (total_results + results_per_page - 1) // results_per_page
+
+                        logger.info(f"Found pagination info: {total_results} total results across {total_pages} pages")
+
+                        if current_page >= total_pages:
+                            logger.info(f"At page {current_page} of {total_pages}, no more pages to fetch")
+                            break
+
+                # Move to next page
+                current_page += 1
+
+            except Exception as e:
+                logger.error(f"Error processing page {current_page}: {e}")
+                break
+
+        logger.info(f"Pagination complete. Scraped {len(all_events)} total events from {pages_processed} pages")
+        return all_events
+
+    def _extract_event_from_card(self, card):
+        """Extract event details from a card element."""
+        # Extract title
+        title_elem = card.select_one('span[itemprop="name"]')
+        title = title_elem.get_text().strip() if title_elem else ""
+
+        if not title:
+            return None
+
+        # Extract URL
+        url_elem = card.select_one('a[itemprop="url"]')
+        url = url_elem.get('href', '') if url_elem else ""
+
+        # Make URL absolute if it's relative
+        if url and not url.startswith('http'):
+            url = f"{self.base_url}{url}" if url.startswith('/') else f"{self.base_url}/{url}"
+
+        # Extract location
+        location_elem = card.select_one('span[itemprop="address"]')
+        location = location_elem.get_text().strip() if location_elem else ""
+
+        # Extract dates (start and end if available)
+        start_date_elem = card.select_one('span[itemprop="startDate"]')
+        end_date_elem = card.select_one('span[itemprop="endDate"]')
+
+        start_date_str = ""
+        end_date_str = ""
+
+        if start_date_elem:
+            start_date_attr = start_date_elem.get('date', '')
+            if start_date_attr:
+                try:
+                    # Parse ISO format date
+                    date_obj = datetime.datetime.strptime(start_date_attr.split()[0], '%Y-%m-%d')
+                    # Format without leading zeros and without year
+                    start_date_str = f"{int(date_obj.day)} {self._get_spanish_month(date_obj.month)}"
+                except Exception as e:
+                    logger.warning(f"Error parsing start date: {e}")
+                    # Fallback to text inside span
+                    start_date_str = card.select_one('.date:not(.hide) span:nth-of-type(2)').get_text().strip() if card.select_one('.date:not(.hide) span:nth-of-type(2)') else ""
+                    # Try to clean up the fallback date text
+                    start_date_str = self._clean_date_text(start_date_str)
+
+        if end_date_elem:
+            end_date_attr = end_date_elem.get('date', '')
+            if end_date_attr:
+                try:
+                    # Parse ISO format date
+                    date_obj = datetime.datetime.strptime(end_date_attr.split()[0], '%Y-%m-%d')
+                    # Format without leading zeros and without year
+                    end_date_str = f"{int(date_obj.day)} {self._get_spanish_month(date_obj.month)}"
+                except Exception as e:
+                    logger.warning(f"Error parsing end date: {e}")
+                    # Fallback to text inside span
+                    end_date_str = card.select_one('.date:not(.hide) span:nth-of-type(4)').get_text().strip() if card.select_one('.date:not(.hide) span:nth-of-type(4)') else ""
+                    # Try to clean up the fallback date text
+                    end_date_str = self._clean_date_text(end_date_str)
+
+        # Format the date string
+        if start_date_str and end_date_str:
+            date = f"{start_date_str} - {end_date_str}"
+        elif start_date_str:
+            date = start_date_str
+        else:
+            # Fallback: try to get the visible date text
+            date_elem = card.select_one('.date')
+            date = date_elem.get_text().strip() if date_elem else ""
+            # Clean up the date text
+            date = re.sub(r'Tiempo\s*', '', date).strip()
+            date = self._clean_date_text(date)
+
+        # Extract description
+        description_elem = card.select_one('.card-hover')
+        description = ""  # No longer extracting descriptions
+
+        # Create and return the event
+        return self._create_event(title, date, location, description, url)
+
+    def _get_spanish_month(self, month_num):
+        """Get Spanish month name from month number (1-12)"""
+        spanish_months = [
+            'enero', 'febrero', 'marzo', 'abril',
+            'mayo', 'junio', 'julio', 'agosto',
+            'septiembre', 'octubre', 'noviembre', 'diciembre'
+        ]
+        return spanish_months[month_num - 1]
+
+    def _clean_date_text(self, date_text):
+        """Clean up date text to remove leading zeros and year"""
+        if not date_text:
+            return date_text
+
+        # Try to remove year (typically "2025" or similar)
+        date_text = re.sub(r'\s+20\d\d', '', date_text)
+
+        # Try to remove leading zeros in day numbers
+        date_text = re.sub(r'\b0(\d)\b', r'\1', date_text)
+
+        return date_text.strip()
