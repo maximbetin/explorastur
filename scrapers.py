@@ -10,22 +10,68 @@ from utils import DateProcessor, TextProcessor
 import datetime
 from bs4.element import Tag
 import json
+from typing import Dict, List, Optional, Any, Union, Callable
+from scraper_utils import fetch_page, parse_html, extract_text, extract_attribute, make_absolute_url
 
 logger = logging.getLogger('explorastur')
 
 class EventScraper:
-    """Base class for event scrapers."""
+    """Base class for event scrapers.
+
+    Provides common functionality for all event scrapers and defines
+    the interface that subclasses must implement.
+    """
 
     def __init__(self):
+        """Initialize the event scraper with common utilities."""
         self.date_processor = DateProcessor()
         self.text_processor = TextProcessor()
+        self.source_name = "Generic"
 
-    def scrape(self):
-        """To be implemented by subclasses."""
+    def scrape(self) -> List[Dict[str, str]]:
+        """Scrape events from the source.
+
+        This method should be implemented by subclasses to scrape events
+        from a specific source.
+
+        Returns:
+            List of event dictionaries
+        """
         raise NotImplementedError("Subclasses must implement scrape method")
 
-    def _create_event(self, title, date, location, description, url, source=None):
-        """Create a standardized event dictionary."""
+    def fetch_and_parse(self, url: str) -> Optional[BeautifulSoup]:
+        """Fetch a URL and parse its HTML content.
+
+        Args:
+            url: The URL to fetch
+
+        Returns:
+            BeautifulSoup object or None if request or parsing failed
+        """
+        html = fetch_page(url)
+        if html:
+            return parse_html(html)
+        return None
+
+    def create_event(self, title: str, date: str, location: str, url: str,
+                    description: str = "", source: Optional[str] = None) -> Dict[str, str]:
+        """Create a standardized event dictionary.
+
+        Args:
+            title: Event title
+            date: Event date
+            location: Event location
+            url: Event URL
+            description: Event description (optional)
+            source: Source name (optional)
+
+        Returns:
+            Event dictionary with standardized format
+        """
+        # Use source name from the class if not provided
+        if not source:
+            source = self.source_name
+
         # Ensure title isn't empty
         if not title or title == ":":
             title = ""  # Let the processor handle empty titles
@@ -42,10 +88,14 @@ class EventScraper:
             'source': source
         }
 
-    def _standardize_date_format(self, date_str):
+    def _standardize_date_format(self, date_str: str) -> str:
         """Standardize date format across all scrapers.
 
-        This helps ensure consistent formatting in the output file.
+        Args:
+            date_str: Date string to standardize
+
+        Returns:
+            Standardized date string
         """
         if not date_str:
             return date_str
@@ -62,6 +112,77 @@ class EventScraper:
 
         return date_str.strip()
 
+    def process_pagination(self, base_url: str, start_url: str,
+                          max_pages: int = 3,
+                          extract_page_events: Optional[Callable[[BeautifulSoup], List[Dict[str, str]]]] = None,
+                          next_page_selector: Optional[str] = None) -> List[Dict[str, str]]:
+        """Process pagination for a website.
+
+        Args:
+            base_url: Base URL of the website
+            start_url: Starting URL for pagination
+            max_pages: Maximum number of pages to process
+            extract_page_events: Function to extract events from a page
+            next_page_selector: CSS selector for next page link
+
+        Returns:
+            List of event dictionaries from all pages
+        """
+        if not extract_page_events:
+            raise ValueError("extract_page_events function must be provided")
+
+        all_events = []
+        current_page = 1
+        current_url = start_url
+
+        while current_page <= max_pages:
+            logger.info(f"Fetching page {current_page}: {current_url}")
+
+            try:
+                soup = self.fetch_and_parse(current_url)
+                if not soup:
+                    break
+
+                # Extract events from the current page
+                page_events = extract_page_events(soup)
+                all_events.extend(page_events)
+
+                logger.info(f"Extracted {len(page_events)} events from page {current_page}")
+
+                # If no next page selector provided, stop after first page
+                if not next_page_selector:
+                    break
+
+                # Find the next page link
+                next_link = soup.select_one(next_page_selector)
+                if not next_link:
+                    logger.info("No next page link found")
+                    break
+
+                # Check if next link is disabled
+                classes = next_link.get('class', [])
+                if classes and 'disabled' in classes:
+                    logger.info("Next page link is disabled")
+                    break
+
+                # Get the URL for the next page
+                next_url = next_link.get('href', '')
+                if not next_url:
+                    logger.info("No next page URL found")
+                    break
+
+                # Make the URL absolute if it's relative
+                if isinstance(next_url, list):
+                    next_url = next_url[0] if next_url else ""
+                current_url = make_absolute_url(base_url, next_url)
+                current_page += 1
+
+            except Exception as e:
+                logger.error(f"Error processing page {current_page}: {e}")
+                break
+
+        return all_events
+
 class TelecableScraper(EventScraper):
     """Scraper for Telecable blog."""
 
@@ -69,6 +190,7 @@ class TelecableScraper(EventScraper):
         super().__init__()
         self.url = "https://blog.telecable.es/agenda-planes-asturias/"
         self.current_month_year = self.date_processor.get_current_month_year()
+        self.source_name = "Telecable"
 
     def scrape(self):
         """Scrape events from Blog Telecable Asturias directly from HTML structure."""
@@ -296,7 +418,7 @@ class TelecableScraper(EventScraper):
 
         # Create event with extracted info
         if clean_title:
-            return self._create_event(
+            return self.create_event(
                 title=clean_title,
                 date=date,
                 location=location,
@@ -329,109 +451,90 @@ class TurismoAsturiaScraper(EventScraper):
         self.base_url = "https://www.turismoasturias.es"
         self.url = f"{self.base_url}/agenda-de-asturias"
         self.max_pages = 3  # Maximum number of pages to scrape to avoid excessive requests
+        self.source_name = "Turismo Asturias"
 
     def scrape(self):
         """Scrape events from Turismo Asturias website with pagination support."""
-        all_events = []
-        current_page = 1
-        pages_processed = 0
-
         logger.info(f"Starting pagination scrape of Turismo Asturias (max {self.max_pages} pages)")
 
-        while current_page <= self.max_pages:
-            # Construct URL with pagination parameters if not on first page
-            if current_page == 1:
-                current_url = self.url
+        # Define page builder for pagination
+        def get_page_url(page_num):
+            if page_num == 1:
+                return self.url
             else:
-                # Construct pagination URL with the proper parameters for page number
-                current_url = (f"{self.url}?p_p_id=as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0"
-                               f"&p_p_lifecycle=0"
-                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_calendarPath=%2Fhtml%2Fsuite%2Fdisplays%2Flist.jsp"
-                               f"&p_r_p_startDate=&p_r_p_endDate=&p_r_p_searchText=&p_r_p_categoryId=0&p_r_p_categoryIds="
-                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_calendarId=0"
-                               f"&p_r_p_tag=&p_r_p_time="
-                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_delta=12"
-                               f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_cur={current_page}")
+                return (f"{self.url}?p_p_id=as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0"
+                       f"&p_p_lifecycle=0"
+                       f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_calendarPath=%2Fhtml%2Fsuite%2Fdisplays%2Flist.jsp"
+                       f"&p_r_p_startDate=&p_r_p_endDate=&p_r_p_searchText=&p_r_p_categoryId=0&p_r_p_categoryIds="
+                       f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_calendarId=0"
+                       f"&p_r_p_tag=&p_r_p_time="
+                       f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_delta=12"
+                       f"&_as_asac_calendar_suite_CalendarSuitePortlet_INSTANCE_JXvXAPSD7JC0_cur={page_num}")
 
-            logger.info(f"Fetching page {current_page}: {current_url}")
+        # Define function to extract events from each page
+        def extract_events_from_page(soup):
+            event_cards = soup.select('div.card[itemscope][itemtype="http://schema.org/Event"]')
+            if not event_cards:
+                logger.warning("No event cards found on this page")
+                return []
 
-            try:
-                # Fetch the current page
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-                response = requests.get(current_url, headers=headers, timeout=30)
-                response.raise_for_status()
-                html = response.text
+            logger.info(f"Found {len(event_cards)} event cards")
 
-                # Parse the page
-                soup = BeautifulSoup(html, 'html.parser')
-                event_cards = soup.select('div.card[itemscope][itemtype="http://schema.org/Event"]')
+            # Process each event card
+            page_events = []
+            for card in event_cards:
+                try:
+                    event = self._extract_event_from_card(card)
+                    if event:
+                        page_events.append(event)
+                except Exception as e:
+                    logger.error(f"Error processing event card: {e}")
+                    continue
 
-                if not event_cards:
-                    logger.warning(f"No event cards found on page {current_page}")
-                    break
+            return page_events
 
-                logger.info(f"Found {len(event_cards)} event cards on page {current_page}")
-                pages_processed += 1  # Increment pages processed counter
+        # Process first page
+        events = []
 
-                # Process each event card
-                page_events = []
-                for card in event_cards:
-                    try:
-                        event = self._extract_event_from_card(card)
-                        if event:
-                            page_events.append(event)
-                    except Exception as e:
-                        logger.error(f"Error processing event card: {e}")
-                        continue
+        # Start with first page
+        soup = self.fetch_and_parse(self.url)
+        if not soup:
+            return events
 
-                # Add this page's events to the total
-                all_events.extend(page_events)
-                logger.info(f"Extracted {len(page_events)} events from page {current_page}")
+        # Extract events from first page
+        first_page_events = extract_events_from_page(soup)
+        events.extend(first_page_events)
 
-                # Check if there's a next page by looking for pagination links
-                pagination = soup.select_one('nav.pagination')
-                if not pagination:
-                    logger.info("No pagination found, this is the only page")
-                    break
+        # Check if there's pagination
+        pagination = soup.select_one('nav.pagination')
+        if not pagination:
+            logger.info("No pagination found, this is the only page")
+            return events
 
-                next_link = pagination.select_one('a.pagination__next')
-                is_disabled = False
-                if next_link and next_link.has_attr('class'):
-                    class_list = next_link['class']
-                    if isinstance(class_list, list) and 'disabled' in class_list:
-                        is_disabled = True
+        # Check if there are more pages
+        pagination_info = soup.select_one('small.search-results')
+        if pagination_info:
+            info_text = pagination_info.get_text().strip()
+            # Extract total results count if available
+            # Search for pattern like "Mostrando el intervalo 1 - 12 de 16 resultados."
+            total_match = re.search(r'de\s+(\d+)\s+resultados', info_text, re.IGNORECASE)
+            if total_match:
+                total_results = int(total_match.group(1))
+                results_per_page = 12  # Default results per page
+                total_pages = (total_results + results_per_page - 1) // results_per_page
+                logger.info(f"Found pagination info: {total_results} total results across {total_pages} pages")
 
-                if not next_link or is_disabled:
-                    logger.info("Reached last page of results")
-                    break
+                # Process remaining pages if any
+                for page_num in range(2, min(total_pages + 1, self.max_pages + 1)):
+                    page_url = get_page_url(page_num)
+                    page_soup = self.fetch_and_parse(page_url)
+                    if page_soup:
+                        page_events = extract_events_from_page(page_soup)
+                        events.extend(page_events)
+                        logger.info(f"Extracted {len(page_events)} events from page {page_num}")
 
-                # Check for pagination information to find total pages
-                pagination_info = soup.select_one('small.search-results')
-                if pagination_info:
-                    info_text = pagination_info.get_text().strip()
-                    # Extract total results count if available
-                    # Search for pattern like "Mostrando el intervalo 1 - 12 de 16 resultados."
-                    total_match = re.search(r'de\s+(\d+)\s+resultados', info_text, re.IGNORECASE)
-                    if total_match:
-                        total_results = int(total_match.group(1))
-                        results_per_page = 12  # Default results per page
-                        total_pages = (total_results + results_per_page - 1) // results_per_page
-
-                        logger.info(f"Found pagination info: {total_results} total results across {total_pages} pages")
-
-                        if current_page >= total_pages:
-                            logger.info(f"At page {current_page} of {total_pages}, no more pages to fetch")
-                            break
-
-                # Move to next page
-                current_page += 1
-
-            except Exception as e:
-                logger.error(f"Error processing page {current_page}: {e}")
-                break
-
-        logger.info(f"Pagination complete. Scraped {len(all_events)} total events from {pages_processed} pages")
-        return all_events
+        logger.info(f"Pagination complete. Scraped {len(events)} total events")
+        return events
 
     def _extract_event_from_card(self, card):
         """Extract event details from a card element."""
@@ -509,7 +612,7 @@ class TurismoAsturiaScraper(EventScraper):
         description = ""  # No longer extracting descriptions
 
         # Create and return the event
-        return self._create_event(title, date, location, description, url, source="Turismo Asturias")
+        return self.create_event(title, date, location, description, url, source="Turismo Asturias")
 
     def _get_spanish_month(self, month_num):
         """Get Spanish month name from month number (1-12)"""
@@ -539,6 +642,7 @@ class OviedoCentrosSocialesScraper(EventScraper):
     def __init__(self):
         super().__init__()
         self.url = "https://www.oviedo.es/centrossociales/avisos"
+        self.source_name = "Centros Sociales Oviedo"
 
     def scrape(self):
         """Scrape events from Oviedo's Centros Sociales website."""
@@ -662,7 +766,7 @@ class OviedoCentrosSocialesScraper(EventScraper):
         location_matches = re.findall(r'(CS\s[\w\s]+|Centro Social[\w\s]+)', description)
         location = "; ".join(location_matches) if location_matches else "Oviedo"
 
-        return self._create_event(
+        return self.create_event(
             title=title,
             date=date,
             location=location,
@@ -697,7 +801,7 @@ class OviedoCentrosSocialesScraper(EventScraper):
                         event_title = f"{title} - {item_text.split('-')[0].strip()}" if '-' in item_text else title
                         event_description = f"{description}\n{item_text}"
 
-                        events.append(self._create_event(
+                        events.append(self.create_event(
                             title=event_title,
                             date=date_time_location["date"],
                             location=date_time_location["location"] or "Oviedo",
@@ -713,7 +817,7 @@ class OviedoCentrosSocialesScraper(EventScraper):
 
         # If no individual events were extracted, create one general event
         if not events and date_range:
-            events.append(self._create_event(
+            events.append(self.create_event(
                 title=title,
                 date=date_range,
                 location="Oviedo",
@@ -789,82 +893,79 @@ class VisitOviedoScraper(EventScraper):
         self.base_url = "https://www.visitoviedo.info"
         self.url = f"{self.base_url}/agenda"
         self.max_pages = 3  # Maximum number of pages to scrape
+        self.source_name = "Visit Oviedo"
 
     def scrape(self):
         """Scrape events from Visit Oviedo tourism website with pagination support."""
+        logger.info(f"Starting pagination scrape of Visit Oviedo (max {self.max_pages} pages)")
+
+        def extract_page_events(soup):
+            """Extract events from a single page"""
+            return self._process_page(soup)
+
+        def find_next_page_url(soup):
+            """Find the URL of the next page"""
+            pagination = soup.select_one('div.paginator')
+            if not pagination:
+                return None
+
+            # Look for "Siguiente" link
+            next_link = pagination.select_one('ul.pager li a:-soup-contains("Siguiente")')
+            if not next_link:
+                # Alternative approach if the first selector doesn't work
+                links = pagination.select('ul.pager li a')
+                next_link = None
+                for link in links:
+                    if 'Siguiente' in link.text:
+                        next_link = link
+                        break
+
+            if not next_link:
+                return None
+
+            return next_link.get('href', '')
+
+        # Process all pages
         all_events = []
         current_page = 1
-        pages_processed = 0
         current_url = self.url
-
-        logger.info(f"Starting pagination scrape of Visit Oviedo (max {self.max_pages} pages)")
 
         while current_page <= self.max_pages:
             logger.info(f"Fetching page {current_page}: {current_url}")
 
             try:
-                # Fetch the current page
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-                if isinstance(current_url, list):
-                    current_url = current_url[0] if current_url else self.url
-                response = requests.get(current_url, headers=headers, timeout=30)
-                response.raise_for_status()
-                html = response.text
+                soup = self.fetch_and_parse(current_url)
+                if not soup:
+                    break
 
-                # Parse HTML
-                soup = BeautifulSoup(html, 'html.parser')
-
-                # Process the current page
-                page_events = self._process_page(soup)
+                # Extract events from the current page
+                page_events = extract_page_events(soup)
                 all_events.extend(page_events)
 
                 logger.info(f"Extracted {len(page_events)} events from page {current_page}")
-                pages_processed += 1
 
-                # Find "Next" link for pagination
-                pagination = soup.select_one('div.paginator')
-                if not pagination:
-                    logger.info("No pagination found, this is the only page")
-                    break
-
-                next_link = pagination.select_one('ul.pager li a:-soup-contains("Siguiente")')
-                if not next_link:
-                    # Alternative selector approach if the first one doesn't work
-                    links = pagination.select('ul.pager li a')
-                    next_link = None
-                    for link in links:
-                        if 'Siguiente' in link.text:
-                            next_link = link
-                            break
-
-                if not next_link:
-                    logger.info("Reached last page of results")
-                    break
-
-                # Get URL for next page
-                next_url = next_link.get('href')
+                # Find the next page URL
+                next_url = find_next_page_url(soup)
                 if not next_url:
-                    logger.info("No next page URL found")
+                    logger.info("No next page found or reached last page")
                     break
 
-                # Make the URL absolute if it's relative
+                # Handle different URL formats
                 if isinstance(next_url, list):
                     next_url = next_url[0] if next_url else ""
 
-                if isinstance(next_url, str) and not next_url.startswith('http'):
+                # Make the URL absolute
+                if next_url and not next_url.startswith('http'):
                     next_url = f"{self.base_url}{next_url}"
 
                 current_url = next_url
                 current_page += 1
 
-            except requests.exceptions.RequestException as e:
-                logger.error(f"HTTP error fetching page {current_page}: {e}")
-                break
             except Exception as e:
                 logger.error(f"Error processing page {current_page}: {e}")
                 break
 
-        logger.info(f"Pagination complete. Scraped {len(all_events)} total events from {pages_processed} pages")
+        logger.info(f"Pagination complete. Scraped {len(all_events)} total events")
         return all_events
 
     def _process_page(self, soup):
@@ -929,7 +1030,7 @@ class VisitOviedoScraper(EventScraper):
                         event_url = self.url
 
                     # Create the event
-                    event = self._create_event(
+                    event = self.create_event(
                         title=title,
                         date=event_date,
                         location=location,

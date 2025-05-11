@@ -204,11 +204,10 @@ class NewSourceScraper(EventScraper):
 ```
 
 ## Planned Sources
+
 - [Biodevas](https://biodevas.org/)
 - [Aviles](https://aviles.es/proximos-eventos)
 - [Cines Embajadores](https://cinesembajadores.es/oviedo/)
-- [Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
-- [Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
 
 ## License
 
