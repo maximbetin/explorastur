@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import re
 from utils import DateProcessor, TextProcessor
 import datetime
+from bs4.element import Tag
 
 logger = logging.getLogger('explorastur')
 
@@ -28,6 +29,9 @@ class EventScraper:
         if not title or title == ":":
             title = ""  # Let the processor handle empty titles
 
+        # Standardize the date format for all events
+        date = self._standardize_date_format(date)
+
         return {
             'title': title,
             'date': date,
@@ -36,6 +40,26 @@ class EventScraper:
             'url': url,
             'source': source
         }
+
+    def _standardize_date_format(self, date_str):
+        """Standardize date format across all scrapers.
+
+        This helps ensure consistent formatting in the output file.
+        """
+        if not date_str:
+            return date_str
+
+        # Remove day of week prefix if present (e.g., "lunes 12 de mayo" → "12 de mayo")
+        date_str = re.sub(r'^(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\s+', '', date_str.strip())
+
+        # Remove leading zeros in day numbers (e.g., "01 mayo" → "1 mayo")
+        date_str = re.sub(r'\b0(\d)(\s+de|\s*[-\/])', r'\1\2', date_str)
+
+        # Remove year suffixes for current year (e.g., "12 mayo 2025" → "12 mayo")
+        current_year = datetime.datetime.now().year
+        date_str = re.sub(f'\\s+{current_year}\\b', '', date_str)
+
+        return date_str.strip()
 
 class TelecableScraper(EventScraper):
     """Scraper for Telecable blog."""
@@ -179,8 +203,8 @@ class TelecableScraper(EventScraper):
         if "todo el mes" in title.lower() and not re.search(r'\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b', title.lower()):
             date = f"Durante todo el mes de {current_month}"
 
-        # Clean up the date to remove leading zeros and year
-        date = self._clean_date_format(date)
+        # Clean up the date is now handled by the base class _standardize_date_format method
+        # when creating the event
 
         # Extract link from the paragraph following the title
         url = ""
@@ -540,7 +564,10 @@ class OviedoCentrosSocialesScraper(EventScraper):
                     continue
 
                 # Get the text content that contains the events
-                text_div = content_section.select_one('div.text')
+                if isinstance(content_section, (BeautifulSoup, Tag)):
+                    text_div = content_section.select_one('div.text')
+                else:
+                    text_div = None
                 if not text_div:
                     continue
 
@@ -707,8 +734,9 @@ class OviedoCentrosSocialesScraper(EventScraper):
         # Look for just date pattern (e.g. "17 de mayo")
         elif re.search(r'(\d{1,2})\s+de\s+(\w+)', text):
             date_match = re.search(r'(\d{1,2})\s+de\s+(\w+)', text)
-            day, month = date_match.groups()
-            result["date"] = f"{day} de {month}"
+            if date_match:
+                day, month = date_match.groups()
+                result["date"] = f"{day} de {month}"
 
         # Look for time pattern (e.g. "17h" or "17:00h")
         time_match = re.search(r'(\d{1,2})[:|.]*(\d{2})*h', text)
@@ -766,6 +794,8 @@ class VisitOviedoScraper(EventScraper):
             try:
                 # Fetch the current page
                 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                if isinstance(current_url, list):
+                    current_url = current_url[0] if current_url else self.url
                 response = requests.get(current_url, headers=headers, timeout=30)
                 response.raise_for_status()
                 html = response.text
@@ -807,7 +837,10 @@ class VisitOviedoScraper(EventScraper):
                     break
 
                 # Make the URL absolute if it's relative
-                if not next_url.startswith('http'):
+                if isinstance(next_url, list):
+                    next_url = next_url[0] if next_url else ""
+
+                if isinstance(next_url, str) and not next_url.startswith('http'):
                     next_url = f"{self.base_url}{next_url}"
 
                 current_url = next_url
@@ -850,9 +883,6 @@ class VisitOviedoScraper(EventScraper):
                     continue
 
                 date_str = f"{day_of_week.text.strip()} {day_of_month.text.strip()} de {month.text.strip()}"
-
-                # Remove the weekday name to standardize date format with other scrapers
-                date_str = re.sub(r'^(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\s+', '', date_str.strip())
 
                 # Extract all event entries for this day
                 event_entries = day_wrapper.select('div.entry')
