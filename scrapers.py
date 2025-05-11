@@ -1045,3 +1045,117 @@ class VisitOviedoScraper(EventScraper):
             logger.error(f"Error extracting events from page: {e}")
 
         return events
+
+class BiodevasScraper(EventScraper):
+    """Scraper for Biodevas.org activities in Asturias."""
+
+    def __init__(self):
+        super().__init__()
+        self.base_url = "https://biodevas.org"
+        self.url = f"{self.base_url}/page/"
+        self.max_pages = 3  # Maximum number of pages to scrape
+        self.source_name = "Biodevas"
+        self._processed_urls = set()  # Track processed URLs to avoid duplicates
+
+    def scrape(self):
+        """Scrape events from Biodevas.org with pagination support."""
+        logger.info(f"Starting pagination scrape of Biodevas (max {self.max_pages} pages)")
+
+        return self.process_pagination(
+            base_url=self.base_url,
+            start_url=self.base_url,
+            max_pages=self.max_pages,
+            extract_page_events=self._extract_events_from_page,
+            next_page_selector='.next.page-numbers'
+        )
+
+    def _extract_events_from_page(self, soup):
+        """Extract events from a single page of Biodevas.org."""
+        events = []
+
+        # Find all event articles
+        articles = soup.select('article.hentry')
+        if not articles:
+            logger.warning("No event articles found on this page")
+            return []
+
+        logger.info(f"Found {len(articles)} event articles")
+
+        for article in articles:
+            try:
+                event = self._extract_event_from_article(article)
+                if event:
+                    events.append(event)
+            except Exception as e:
+                logger.error(f"Error processing event article: {e}")
+                continue
+
+        return events
+
+    def _extract_event_from_article(self, article):
+        """Extract event information from an article element."""
+        # Extract title
+        title_elem = article.select_one('h2.entry-title a')
+        if not title_elem:
+            return None
+
+        title = title_elem.get_text().strip()
+
+        # Extract URL
+        url = title_elem.get('href', '')
+
+        # Skip if we've already processed this URL
+        if url in self._processed_urls:
+            return None
+        self._processed_urls.add(url)
+
+        # Extract tags for location info
+        tags = article.select('.tags a')
+        location = "Asturias"  # Default location
+
+        # Look for location tags
+        for tag in tags:
+            tag_text = tag.get_text().strip()
+            if tag_text in ["Oviedo", "Gijón", "Avilés", "Lugones", "Siero", "Villaviciosa"]:
+                location = tag_text
+                break
+
+        # Extract date from content
+        date = ""
+        summary = article.select_one('.entry-summary')
+        if summary:
+            summary_text = summary.get_text().strip()
+
+            # First try specific patterns common on this site
+            date_match = re.search(r'(\d{1,2}).*?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)', summary_text, re.IGNORECASE)
+            if date_match:
+                date = date_match.group(0)
+            else:
+                # Use utility function from scraper_utils
+                from scraper_utils import extract_date_from_text
+                date = extract_date_from_text(summary_text)
+
+            # If no date found, try to find if it's an ongoing activity
+            if not date:
+                if "todo tipo de públicos" in summary_text or "actividad gratuita" in summary_text.lower():
+                    date = "Actividad permanente"
+
+        # If no date found in summary, check if there are any date tags
+        if not date:
+            for tag in tags:
+                tag_text = tag.get_text().strip().lower()
+                # Check if tag contains a month name
+                months = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                         "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+                if any(month in tag_text for month in months):
+                    date = tag_text
+                    break
+
+        # Create and return the event
+        return self.create_event(
+            title=title,
+            date=date,
+            location=location,
+            url=url,
+            source=self.source_name
+        )

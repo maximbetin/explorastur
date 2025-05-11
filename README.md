@@ -202,13 +202,6 @@ class NewSourceScraper(EventScraper):
         # ... scraping code ...
         return events
 ```
-
-## Planned Sources
-
-- [Biodevas](https://biodevas.org/)
-- [Aviles](https://aviles.es/proximos-eventos)
-- [Cines Embajadores](https://cinesembajadores.es/oviedo/)
-
 ## License
 
 [MIT License]
