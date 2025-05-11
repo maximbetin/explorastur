@@ -1,5 +1,5 @@
 """
-Scraper for Oviedo's social centers announcements and events.
+Scraper for Oviedo city social centers announcements.
 """
 
 import logging
@@ -14,15 +14,10 @@ from scrapers.base import EventScraper
 logger = logging.getLogger('explorastur')
 
 class OviedoAnnouncementsScraper(EventScraper):
-    """Scraper for Oviedo's social centers announcements and events."""
+    """Scraper for Oviedo city social centers announcements."""
 
     def __init__(self, config=None):
         super().__init__(config)
-
-        if not config:
-            self.url = "https://www.oviedo.es/centrossociales/avisos"
-            self.source_name = "Centros Sociales Oviedo"
-            self.base_url = "https://www.oviedo.es"
 
     def scrape(self):
         """Scrape events from Oviedo's social centers announcements page."""

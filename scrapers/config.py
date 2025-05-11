@@ -7,7 +7,7 @@ This module contains all scraper configurations and settings centralized in one 
 import os
 from typing import Dict, Any, List
 
-# Global scraper settings
+# Global scraper settings - default for all scrapers
 GLOBAL_SETTINGS = {
     # Request settings
     "timeout": 30,
@@ -22,44 +22,53 @@ GLOBAL_SETTINGS = {
 
     # Output settings
     "output_dir": os.path.join(os.getcwd(), "output"),
+
+    # Default source name if not specified
+    "name": "Generic",
+
+    # Default URL if not specified
+    "url": "",
+
+    # Default enabled state
+    "enabled": True,
 }
 
-# Site-specific configurations
+# Site-specific configurations - only specify values that differ from GLOBAL_SETTINGS
 SITE_CONFIGS = {
     "telecable": {
         "name": "Telecable",
         "url": "https://blog.telecable.es/agenda-planes-asturias/",
-        "enabled": True,
+        "base_url": "https://blog.telecable.es",
     },
 
     "turismo_asturias": {
         "name": "Turismo Asturias",
         "url": "https://www.turismoasturias.es/agenda-de-asturias",
-        "enabled": True,
+        "base_url": "https://www.turismoasturias.es",
     },
 
     "visit_oviedo": {
         "name": "Visit Oviedo",
         "url": "https://www.visitoviedo.info/agenda",
-        "enabled": True,
+        "base_url": "https://www.visitoviedo.info",
     },
 
     "biodevas": {
         "name": "Biodevas",
         "url": "https://biodevas.org/",
-        "enabled": True,
+        "base_url": "https://biodevas.org",
     },
 
     "aviles": {
         "name": "Avilés",
         "url": "https://aviles.es/es/proximos-eventos",
-        "enabled": True,
+        "base_url": "https://aviles.es",
     },
 
     "oviedo_announcements": {
         "name": "Centros Sociales Oviedo",
         "url": "https://www.oviedo.es/centrossociales/avisos",
-        "enabled": True,
+        "base_url": "https://www.oviedo.es",
     },
 }
 
@@ -72,7 +81,7 @@ def get_scraper_configs() -> List[Dict[str, Any]]:
     """
     configs = []
     for key, config in SITE_CONFIGS.items():
-        if config.get("enabled", True):
+        if config.get("enabled", GLOBAL_SETTINGS["enabled"]):
             # Merge global settings with site-specific config
             full_config = {**GLOBAL_SETTINGS, **config, "id": key}
             configs.append(full_config)
@@ -93,3 +102,12 @@ def get_config_for_scraper(scraper_id: str) -> Dict[str, Any]:
 
     config = SITE_CONFIGS[scraper_id]
     return {**GLOBAL_SETTINGS, **config, "id": scraper_id}
+
+def get_default_config() -> Dict[str, Any]:
+    """
+    Get the default configuration for when no specific config is provided.
+
+    Returns:
+        Default configuration dictionary
+    """
+    return {**GLOBAL_SETTINGS}

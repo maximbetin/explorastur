@@ -8,10 +8,11 @@ import time
 from bs4 import BeautifulSoup
 import re
 import datetime
-from typing import Dict, List, Optional, Any, Union, Callable
+from typing import Dict, List, Optional, Any, Union, Callable, cast
 
 from utils import DateProcessor, TextProcessor
 from scraper_utils import parse_html, make_absolute_url
+from scrapers.config import get_default_config
 
 logger = logging.getLogger('explorastur')
 
@@ -30,27 +31,28 @@ class EventScraper:
         """
         self.date_processor = DateProcessor()
         self.text_processor = TextProcessor()
-        self.source_name = "Generic"
 
-        # Apply configuration if provided
-        self.config = config or {}
-        if config:
-            self.source_name = config.get("name", self.source_name)
-            self.url = config.get("url", "")
-            self.timeout = config.get("timeout", 30)
-            self.max_retries = config.get("max_retries", 3)
-            self.retry_delay = config.get("retry_delay", 2)
-            self.headers = config.get("headers", {})
-            self.max_pages = config.get("max_pages", 3)
-        else:
-            self.url = ""
-            self.timeout = 30
-            self.max_retries = 3
-            self.retry_delay = 2
-            self.headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
-            self.max_pages = 3
+        # Apply configuration - use defaults if none provided
+        default_config = get_default_config()
+        self.config = config or default_config
+
+        # Extract common configuration parameters
+        self.source_name = str(self.config.get("name", default_config["name"]))
+        self.url = str(self.config.get("url", default_config["url"]))
+
+        # Set base_url - default to derived from URL if not provided
+        base_url_default = ""
+        if self.url and "//" in self.url:
+            url_parts = self.url.split("/")
+            if len(url_parts) >= 3:
+                base_url_default = url_parts[0] + "//" + url_parts[2]
+
+        self.base_url = str(self.config.get("base_url", base_url_default))
+        self.timeout = int(self.config.get("timeout", default_config["timeout"]))
+        self.max_retries = int(self.config.get("max_retries", default_config["max_retries"]))
+        self.retry_delay = int(self.config.get("retry_delay", default_config["retry_delay"]))
+        self.headers = self.config.get("headers", default_config["headers"])
+        self.max_pages = int(self.config.get("max_pages", default_config["max_pages"]))
 
     def scrape(self) -> List[Dict[str, str]]:
         """Scrape events from the source.
@@ -129,23 +131,22 @@ class EventScraper:
             Event dictionary with standardized format
         """
         # Use source name from the class if not provided
-        if not source:
-            source = self.source_name
+        source_name = source if source else self.source_name
 
         # Ensure title isn't empty
-        if not title or title == ":":
-            title = ""  # Let the processor handle empty titles
+        title_str = "" if not title or title == ":" else title
 
         # Standardize the date format for all events
-        date = self._standardize_date_format(date)
+        date_str = self._standardize_date_format(date)
 
+        # Ensure all values are strings
         return {
-            'title': title,
-            'date': date,
-            'location': location,
-            'description': description,
-            'url': url,
-            'source': source
+            'title': str(title_str),
+            'date': str(date_str),
+            'location': str(location),
+            'description': str(description),
+            'url': str(url),
+            'source': str(source_name)
         }
 
     def _standardize_date_format(self, date_str: str) -> str:
@@ -191,15 +192,14 @@ class EventScraper:
         if not extract_page_events:
             raise ValueError("extract_page_events function must be provided")
 
-        # Use instance max_pages if not provided
-        if max_pages is None:
-            max_pages = self.max_pages
+        # Use instance max_pages if not provided, ensure it's an int
+        pages_to_fetch = self.max_pages if max_pages is None else int(max_pages)
 
         all_events = []
         current_page = 1
         current_url = start_url
 
-        while current_page <= max_pages:
+        while current_page <= pages_to_fetch:
             logger.info(f"Fetching page {current_page}: {current_url}")
 
             try:

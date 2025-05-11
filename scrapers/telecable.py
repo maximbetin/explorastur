@@ -18,10 +18,7 @@ class TelecableScraper(EventScraper):
 
     def __init__(self, config=None):
         super().__init__(config)
-        if not config:
-            self.url = "https://blog.telecable.es/agenda-planes-asturias/"
-            self.source_name = "Telecable"
-
+        # Initialize scraper-specific attributes
         self.current_month_year = self.date_processor.get_current_month_year()
 
     def scrape(self):

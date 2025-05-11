@@ -1,5 +1,5 @@
 """
-Scraper for Visit Oviedo events.
+Scraper for Visit Oviedo website.
 """
 
 import logging
@@ -18,15 +18,7 @@ class VisitOviedoScraper(EventScraper):
 
     def __init__(self, config=None):
         super().__init__(config)
-
-        if not config:
-            self.base_url = "https://www.visitoviedo.info"
-            self.url = "https://www.visitoviedo.info/agenda"
-            self.source_name = "Visit Oviedo"
-        else:
-            self.base_url = "https://www.visitoviedo.info"
-            # Use the URL from config, but keep the base_url for building absolute URLs
-            self.url = config.get("url", "https://www.visitoviedo.info/agenda")
+        # No need for custom URL or source_name as they're handled by the base class
 
     def scrape(self):
         """Scrape events from Visit Oviedo website with pagination support."""

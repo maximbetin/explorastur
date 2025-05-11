@@ -19,15 +19,6 @@ class TurismoAsturiaScraper(EventScraper):
     def __init__(self, config=None):
         super().__init__(config)
 
-        if not config:
-            self.base_url = "https://www.turismoasturias.es"
-            self.url = f"{self.base_url}/agenda-de-asturias"
-            self.source_name = "Turismo Asturias"
-        else:
-            self.base_url = "https://www.turismoasturias.es"
-            # Use the URL from config, but keep the base_url for building absolute URLs
-            self.url = config.get("url", f"{self.base_url}/agenda-de-asturias")
-
     def scrape(self):
         """Scrape events from Turismo Asturias website with pagination support."""
         all_events = []

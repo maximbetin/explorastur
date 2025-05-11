@@ -18,11 +18,7 @@ class AvilesEventsScraper(EventScraper):
 
     def __init__(self, config=None):
         super().__init__(config)
-
-        if not config:
-            self.url = "https://aviles.es/es/proximos-eventos"
-            self.source_name = "Avilés"
-        self.base_url = "https://aviles.es"
+        # No need for redundant configuration - handled by base class
 
     def scrape(self):
         """Scrape events from Avilés website."""

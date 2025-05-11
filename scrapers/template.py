@@ -30,13 +30,8 @@ class TemplateScraper(EventScraper):
             config: Configuration dictionary for the scraper
         """
         super().__init__(config)
-
-        # If no config is provided, set default values
-        if not config:
-            self.url = "https://example.com/events"
-            self.source_name = "Template Source"
-
-        # Add any other initialization needed for this specific scraper
+        # Add any scraper-specific initialization here
+        # No need to set url or source_name as they're handled by the base class
 
     def scrape(self) -> List[Dict[str, str]]:
         """Scrape events from the source.

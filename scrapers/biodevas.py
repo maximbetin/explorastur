@@ -19,11 +19,6 @@ class BiodevasScraper(EventScraper):
     def __init__(self, config=None):
         super().__init__(config)
 
-        if not config:
-            self.url = "https://biodevas.org/"
-            self.source_name = "Biodevas"
-        self.base_url = "https://biodevas.org"
-
     def scrape(self):
         """Scrape events from Biodevas website."""
         events = []
