@@ -169,7 +169,8 @@ class EventProcessor:
             'Turismo Asturias': 'https://www.turismoasturias.es/agenda-de-asturias',
             'Centros Sociales Oviedo': 'https://www.oviedo.es/centrossociales/avisos',
             'Visit Oviedo': 'https://www.visitoviedo.info/agenda',
-            'Biodevas': 'https://biodevas.org'
+            'Biodevas': 'https://biodevas.org',
+            'Avilés': 'https://aviles.es/proximos-eventos'
         }
 
         # Sort sources to ensure consistent order

@@ -75,28 +75,6 @@ The system is designed to work with any month or year:
 
 This means the scraper will continue to work correctly throughout the year without requiring manual updates to the code when the month changes.
 
-## Output Format
-
-Events are grouped by source and presented chronologically, with the following format:
-
-```
-# Eventos en Asturias
-
-_Actualizado: 11/05/2025_
-
-## [Telecable](https://blog.telecable.es/agenda-planes-asturias/)
-
-**Durante todo el mes de mayo**: Estaciones interiores
-   - Lugar: Museo de Bellas Artes de Asturias (Oviedo)
-   - Link: https://www.museobbaa.com/exposicion/covadonda-valdes-more-estaciones-interiores/
-
-## [Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)
-
-**9 mayo - 18 mayo**: Jornadas Gastronómicas de la Llámpara. Villaviciosa
-   - Lugar: Quintes y Quintueles
-   - Link: https://www.turismoasturias.es/agenda-de-asturias/-/calendarsuite/event/...
-```
-
 ## Project Structure
 
 ```

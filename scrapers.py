@@ -1159,3 +1159,160 @@ class BiodevasScraper(EventScraper):
             url=url,
             source=self.source_name
         )
+
+class AvilesEventsScraper(EventScraper):
+    """Scraper for upcoming events from the Avilés city website."""
+
+    def __init__(self):
+        super().__init__()
+        self.base_url = "https://aviles.es"
+        self.url = f"{self.base_url}/proximos-eventos"
+        self.source_name = "Avilés"
+
+    def scrape(self):
+        """Scrape events from the Avilés city website."""
+        logger.info(f"Fetching events from Avilés website")
+
+        # Only process the first page as pagination requires authentication
+        soup = self.fetch_and_parse(self.url)
+        if not soup:
+            logger.error("Failed to fetch Avilés events page")
+            return []
+
+        return self._extract_events_from_page(soup)
+
+    def _extract_events_from_page(self, soup):
+        """Extract events from a single page."""
+        events = []
+
+        # Find all event cards
+        event_cards = soup.select('.card.border-info')
+        if not event_cards:
+            logger.warning("No event cards found on this page")
+            return []
+
+        logger.info(f"Found {len(event_cards)} event cards")
+
+        for card in event_cards:
+            try:
+                event = self._extract_event_from_card(card)
+                if event:
+                    events.append(event)
+            except Exception as e:
+                logger.error(f"Error processing event card: {e}")
+                continue
+
+        return events
+
+    def _extract_event_from_card(self, card):
+        """Extract event information from a card element."""
+        # Extract title
+        title_elem = card.select_one('h5')
+        if not title_elem:
+            return None
+
+        title = title_elem.get_text().strip()
+
+        # Extract dates and other metadata from badges
+        badges = card.select('.badge.badge-secondary')
+
+        # Initialize variables
+        event_date = ""
+        event_end_date = ""
+        is_recurring = False
+        recurrence_end = ""
+
+        for badge in badges:
+            badge_text = badge.get_text().strip()
+
+            if badge_text.startswith("INICIO:"):
+                # Extract start date and time
+                date_parts = badge_text.replace("INICIO:", "").strip().split()
+                if len(date_parts) >= 1:
+                    # Format date properly
+                    try:
+                        date_obj = datetime.datetime.strptime(date_parts[0], "%d-%m-%Y")
+                        day = date_obj.day
+                        month = self._get_spanish_month(date_obj.month)
+                        event_date = f"{day} de {month}"
+
+                        # Add time if available
+                        if len(date_parts) >= 2:
+                            event_date += f" - {date_parts[1]}"
+                    except Exception as e:
+                        logger.warning(f"Error parsing start date: {e}")
+                        event_date = badge_text.replace("INICIO:", "").strip()
+
+            elif badge_text.startswith("Evento Recurrente"):
+                is_recurring = True
+                # Extract recurrence end date
+                match = re.search(r'Finaliza:\s+(\d{2}-\d{2}-\d{4})', badge_text)
+                if match:
+                    try:
+                        end_date = match.group(1)
+                        date_obj = datetime.datetime.strptime(end_date, "%d-%m-%Y")
+                        recurrence_end = f"hasta el {date_obj.day} de {self._get_spanish_month(date_obj.month)}"
+                    except Exception as e:
+                        logger.warning(f"Error parsing recurrence end date: {e}")
+                        recurrence_end = badge_text.replace("Evento Recurrente - Finaliza:", "").strip()
+
+        # If it's a recurring event, add that information to the date
+        if is_recurring and recurrence_end:
+            if event_date:
+                event_date = f"{event_date} ({recurrence_end})"
+            else:
+                event_date = f"Evento recurrente {recurrence_end}"
+
+        # Extract description and other details
+        description_elem = card.select_one('.card-text')
+        description = description_elem.get_text().strip() if description_elem else ""
+
+        # Extract location from description
+        location = "Avilés"  # Default location
+
+        # Common venue keywords to look for
+        venue_keywords = [
+            "Teatro", "Auditorio", "Sala", "Centro", "Museo",
+            "Plaza", "Pabellón", "Recinto", "Factoría", "Palacio",
+            "Niemeyer", "CMAE", "Escuela"
+        ]
+
+        # Try to find venue in description
+        for keyword in venue_keywords:
+            pattern = rf"{keyword}\s+[A-Za-zÀ-ÿ\s\.]+"
+            match = re.search(pattern, description, re.IGNORECASE)
+            if match:
+                location = match.group(0).strip()
+                break
+
+        # Look for specific venue mentions
+        if "Palacio Valdés" in description or "Teatro Palacio" in description:
+            location = "Teatro Palacio Valdés"
+        elif "Centro Niemeyer" in description or "Niemeyer" in description:
+            location = "Centro Niemeyer"
+        elif "CMAE" in description:
+            location = "Centro Municipal de Arte y Exposiciones (CMAE)"
+        elif "Factoría Cultural" in description:
+            location = "Factoría Cultural de Avilés"
+
+        # Event URL - We don't have direct links in the cards,
+        # so we'll use the main page URL
+        url = self.url
+
+        # Create and return the event
+        return self.create_event(
+            title=title,
+            date=event_date,
+            location=location,
+            url=url,
+            source=self.source_name
+        )
+
+    def _get_spanish_month(self, month_num):
+        """Get Spanish month name from month number (1-12)."""
+        spanish_months = [
+            'enero', 'febrero', 'marzo', 'abril',
+            'mayo', 'junio', 'julio', 'agosto',
+            'septiembre', 'octubre', 'noviembre', 'diciembre'
+        ]
+        return spanish_months[month_num - 1]

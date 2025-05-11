@@ -9,7 +9,7 @@ import os
 import datetime
 import logging
 import sys
-from scrapers import TelecableScraper, TurismoAsturiaScraper, OviedoCentrosSocialesScraper, VisitOviedoScraper, BiodevasScraper
+from scrapers import TelecableScraper, TurismoAsturiaScraper, OviedoCentrosSocialesScraper, VisitOviedoScraper, BiodevasScraper, AvilesEventsScraper
 from processor import EventProcessor
 
 # Create necessary directories
@@ -54,7 +54,8 @@ def main():
             ('Turismo Asturias', TurismoAsturiaScraper()),
             ('Centros Sociales Oviedo', OviedoCentrosSocialesScraper()),
             ('Visit Oviedo', VisitOviedoScraper()),
-            ('Biodevas', BiodevasScraper())
+            ('Biodevas', BiodevasScraper()),
+            ('Avilés', AvilesEventsScraper())
         ]
 
         # Run each scraper and collect events
