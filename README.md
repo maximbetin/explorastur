@@ -177,9 +177,7 @@ The codebase follows these design principles:
 - [Viescu](https://viescu.info/)
 - [Biodevas](https://biodevas.org/)
 - [Aviles](https://aviles.es/proximos-eventos)
-- [Visit Oviedo Tourism](https://www.visitoviedo.info/agenda) (broader than Centros Sociales)
 - [Cines Embajadores](https://cinesembajadores.es/oviedo/)
-- [Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
 - [Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
 
 ## License
