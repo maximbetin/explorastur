@@ -136,13 +136,14 @@ class EventProcessor:
                     source = 'Telecable'
                 elif 'turismoasturias.es' in url:
                     source = 'Turismo Asturias'
+                elif 'oviedo.es/centrossociales' in url:
+                    source = 'Centros Sociales Oviedo'
                 else:
                     # If the URL doesn't match known patterns, check for other known URLs
                     if (url.startswith('https://www.museobbaa.com/') or
                         url.startswith('https://avilescomarca.info/') or
                         url.startswith('https://antonionajarro.com/') or
                         url.startswith('https://www.gijon.es/') or
-                        url.startswith('https://www.oviedo.es/') or
                         url.startswith('https://www.instagram.com/') or
                         url.startswith('https://www.laboralciudaddelacultura.com/') or
                         url.startswith('https://evamcbel.com/') or
@@ -163,7 +164,8 @@ class EventProcessor:
         # Add source links as headers
         source_urls = {
             'Telecable': 'https://blog.telecable.es/agenda-planes-asturias/',
-            'Turismo Asturias': 'https://www.turismoasturias.es/agenda-de-asturias'
+            'Turismo Asturias': 'https://www.turismoasturias.es/agenda-de-asturias',
+            'Centros Sociales Oviedo': 'https://www.oviedo.es/centrossociales/avisos'
         }
 
         # Sort sources to ensure consistent order
@@ -205,7 +207,30 @@ class EventProcessor:
                     # Remove any remaining quotes anywhere in the title
                     title = title.replace('"', '')
 
-                    # Add the event title without quotes
+                    # Convert all-uppercase or partially uppercase titles to title case
+                    # Simpler approach: Convert all uppercase words to title case
+                    words = title.split()
+                    fixed_words = []
+
+                    # List of small words that should be lowercase unless they're the first word
+                    small_words = ['a', 'e', 'o', 'y', 'u', 'de', 'la', 'el', 'del', 'los', 'las', 'en', 'con', 'por',
+                                  'para', 'al', 'su', 'sus', 'tu', 'tus', 'mi', 'mis', 'un', 'una', 'unos', 'unas', 'lo', 'que']
+
+                    for i, word in enumerate(words):
+                        # Skip small common words and acronyms (2 chars or less)
+                        if word.isupper() and len(word) > 2:
+                            word = word.capitalize()
+                        # Check if it's a lowercase common preposition/article and not the first word
+                        elif word.lower() in small_words and i > 0:
+                            word = word.lower()
+                        # Capitalize first word
+                        elif i == 0 and not word.isupper():
+                            word = word.capitalize()
+                        fixed_words.append(word)
+
+                    title = ' '.join(fixed_words)
+
+                    # Add the event title
                     markdown += f"   - {title}\n"
 
                     # Add location if available and not just "Asturias" - use "Lugar" in Spanish

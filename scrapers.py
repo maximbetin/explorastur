@@ -497,3 +497,247 @@ class TurismoAsturiaScraper(EventScraper):
         date_text = re.sub(r'\b0(\d)\b', r'\1', date_text)
 
         return date_text.strip()
+
+class OviedoCentrosSocialesScraper(EventScraper):
+    """Scraper for Oviedo's social centers (Centros Sociales)."""
+
+    def __init__(self):
+        super().__init__()
+        self.url = "https://www.oviedo.es/centrossociales/avisos"
+
+    def scrape(self):
+        """Scrape events from Oviedo's Centros Sociales website."""
+        events = []
+        logger.info(f"Fetching URL: {self.url}")
+
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            response = requests.get(self.url, headers=headers, timeout=30)
+            response.raise_for_status()
+            html = response.text
+        except Exception as e:
+            logger.error(f"Error fetching {self.url}: {e}")
+            return []
+
+        # Parse HTML
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+
+            # Find agendas and other events
+            agenda_headers = soup.select('div.taglib-header h3.header-title span')
+
+            for header in agenda_headers:
+                header_text = header.get_text().strip()
+
+                # Find the content associated with this header
+                header_parent = header.find_parent('div', class_='taglib-header')
+                if not header_parent:
+                    continue
+
+                # Get the next asset-full-content section
+                content_section = header_parent.find_next_sibling('div', class_='asset-full-content')
+                if not content_section:
+                    continue
+
+                # Get the text content that contains the events
+                text_div = content_section.select_one('div.text')
+                if not text_div:
+                    continue
+
+                # Extract events based on the header type
+                if "Agenda Centros Sociales" in header_text:
+                    # Process an agenda which contains multiple events
+                    agenda_events = self._extract_agenda_events(text_div, header_text)
+                    events.extend(agenda_events)
+                else:
+                    # Process a single event/announcement
+                    event = self._extract_single_event(text_div, header_text)
+                    if event:
+                        events.append(event)
+
+        except Exception as e:
+            logger.error(f"Error parsing HTML: {e}")
+            return []
+
+        logger.info(f"Successfully extracted {len(events)} events from Oviedo Centros Sociales")
+        return events
+
+    def _extract_agenda_events(self, text_div, header_text):
+        """Extract multiple events from an agenda section."""
+        events = []
+
+        # Try to extract date range from header
+        date_range = self._extract_date_range(header_text)
+
+        # Find all event sections - each starts with a <p><strong> element
+        event_sections = []
+        current_section = {"title": "", "details": []}
+
+        for element in text_div.find_all(['p', 'ul']):
+            # If we find a title (in a <p><strong> element)
+            if element.name == 'p' and element.find('strong'):
+                # Save previous section if it exists
+                if current_section["title"]:
+                    event_sections.append(current_section)
+
+                # Start a new section
+                current_section = {
+                    "title": element.get_text().strip(),
+                    "details": []
+                }
+            # Add details to current section
+            elif current_section["title"]:
+                current_section["details"].append(element)
+
+        # Don't forget the last section
+        if current_section["title"]:
+            event_sections.append(current_section)
+
+        # Process each event section
+        for section in event_sections:
+            # Skip empty sections
+            if not section["title"] or not section["details"]:
+                continue
+
+            # Extract individual events
+            extracted_events = self._parse_event_section(section["title"], section["details"], date_range)
+            events.extend(extracted_events)
+
+        return events
+
+    def _extract_single_event(self, text_div, title):
+        """Extract a single event/announcement."""
+        # Extract description
+        description = self._get_full_text(text_div)
+
+        # Try to find date in the text
+        date_match = re.search(r'(\d{1,2}\sde\s\w+(\sde\s\d{4})?)', description)
+        date = date_match.group(0) if date_match else ""
+
+        # If no specific date but there's a deadline, use it
+        if not date:
+            deadline_match = re.search(r'hasta el (\d{1,2}\sde\s\w+(\sde\s\d{4})?)', description)
+            if deadline_match:
+                date = f"Hasta el {deadline_match.group(1)}"
+
+        # Extract location (usually contains "CS" or "Centro Social")
+        location_matches = re.findall(r'(CS\s[\w\s]+|Centro Social[\w\s]+)', description)
+        location = "; ".join(location_matches) if location_matches else "Oviedo"
+
+        return self._create_event(
+            title=title,
+            date=date,
+            location=location,
+            description=description,
+            url=self.url,
+            source="Centros Sociales Oviedo"
+        )
+
+    def _parse_event_section(self, section_title, details, date_range):
+        """Parse an event section into individual events."""
+        events = []
+
+        # Clean the section title
+        title = section_title.replace('<strong>', '').replace('</strong>', '').strip()
+
+        # Basic description is the title
+        description = title
+
+        # Combine details
+        details_text = ""
+        for detail in details:
+            if detail.name == 'ul':
+                for li in detail.find_all('li'):
+                    # Each list item could be a separate event or part of the same event
+                    item_text = li.get_text().strip()
+
+                    # Try to extract date, time and location
+                    date_time_location = self._extract_date_time_location(item_text)
+
+                    if date_time_location["date"]:
+                        # If we have a date, this item is likely a separate event
+                        event_title = f"{title} - {item_text.split('-')[0].strip()}" if '-' in item_text else title
+                        event_description = f"{description}\n{item_text}"
+
+                        events.append(self._create_event(
+                            title=event_title,
+                            date=date_time_location["date"],
+                            location=date_time_location["location"] or "Oviedo",
+                            description=event_description,
+                            url=self.url,
+                            source="Centros Sociales Oviedo"
+                        ))
+                    else:
+                        # No date, just add to details
+                        details_text += f"\n- {item_text}"
+            else:
+                details_text += f"\n{detail.get_text().strip()}"
+
+        # If no individual events were extracted, create one general event
+        if not events and date_range:
+            events.append(self._create_event(
+                title=title,
+                date=date_range,
+                location="Oviedo",
+                description=f"{description}{details_text}",
+                url=self.url,
+                source="Centros Sociales Oviedo"
+            ))
+
+        return events
+
+    def _extract_date_range(self, header_text):
+        """Extract date range from header text."""
+        date_match = re.search(r'(\d{1,2})\s+de\s+(\w+)\s+a\s+(\d{1,2})\s+de\s+(\w+)', header_text)
+        if date_match:
+            start_day, start_month, end_day, end_month = date_match.groups()
+            return f"Del {start_day} al {end_day} de {end_month}"
+        return ""
+
+    def _extract_date_time_location(self, text):
+        """Extract date, time and location from text."""
+        result = {"date": "", "time": "", "location": ""}
+
+        # Look for weekday + date pattern (e.g. "MIÉRCOLES 14 de mayo")
+        weekday_date_match = re.search(r'([Ll]unes|[Mm]artes|[Mm]iércoles|[Jj]ueves|[Vv]iernes|[Ss]ábado|[Dd]omingo)\s+(\d{1,2})\s+de\s+(\w+)', text)
+        if weekday_date_match:
+            weekday, day, month = weekday_date_match.groups()
+            result["date"] = f"{weekday} {day} de {month}"
+
+        # Look for just date pattern (e.g. "17 de mayo")
+        elif re.search(r'(\d{1,2})\s+de\s+(\w+)', text):
+            date_match = re.search(r'(\d{1,2})\s+de\s+(\w+)', text)
+            day, month = date_match.groups()
+            result["date"] = f"{day} de {month}"
+
+        # Look for time pattern (e.g. "17h" or "17:00h")
+        time_match = re.search(r'(\d{1,2})[:|.]*(\d{2})*h', text)
+        if time_match:
+            hour = time_match.group(1)
+            minutes = time_match.group(2) if time_match.group(2) else "00"
+            result["time"] = f"{hour}:{minutes}"
+
+            # Add time to date if we have both
+            if result["date"]:
+                result["date"] = f"{result['date']} - {result['time']}"
+
+        # Look for location (CS + name)
+        location_match = re.search(r'(CS\s[\w\s]+|Centro Social[\w\s]+)', text)
+        if location_match:
+            result["location"] = location_match.group(0).strip()
+
+        return result
+
+    def _get_full_text(self, element):
+        """Extract all text from an element and its children."""
+        if not element:
+            return ""
+
+        texts = []
+        for child in element.children:
+            if child.name:
+                texts.append(self._get_full_text(child))
+            else:
+                texts.append(child.strip())
+
+        return " ".join(text for text in texts if text)

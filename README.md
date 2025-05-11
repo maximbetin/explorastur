@@ -35,6 +35,7 @@ The tool is extremely simple:
 
 - **[Telecable Blog](https://blog.telecable.es/agenda-planes-asturias/)**: A monthly article with event listings
 - **[Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)**: The official tourism website for Asturias with pagination support
+- **[Centros Sociales Oviedo](https://www.oviedo.es/centrossociales/avisos)**: Events from Oviedo's network of social centers
 
 ## Features
 
@@ -129,6 +130,7 @@ explorastur/
 - Base class `EventScraper`: Defines interface for all scrapers
 - `TelecableScraper`: Implementation for Telecable blog
 - `TurismoAsturiaScraper`: Implementation for Turismo Asturias website with pagination support
+- `OviedoCentrosSocialesScraper`: Implementation for Oviedo's social centers events
 - Each scraper is responsible for obtaining raw event data
 
 ### processor.py
@@ -162,7 +164,7 @@ The codebase follows these design principles:
 
 ## Troubleshooting
 
-- **Missing data**: Check if the Telecable blog structure has changed
+- **Missing data**: Check if the website structures have changed (Telecable blog, Turismo Asturias, or Oviedo Centros Sociales)
 - **Connection errors**: Ensure you have a stable internet connection
 
 ## Important Notes
@@ -175,7 +177,7 @@ The codebase follows these design principles:
 - [Viescu](https://viescu.info/)
 - [Biodevas](https://biodevas.org/)
 - [Aviles](https://aviles.es/proximos-eventos)
-- [Visit Oviedo](https://www.visitoviedo.info/agenda)
+- [Visit Oviedo Tourism](https://www.visitoviedo.info/agenda) (broader than Centros Sociales)
 - [Cines Embajadores](https://cinesembajadores.es/oviedo/)
 - [Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
 - [Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
