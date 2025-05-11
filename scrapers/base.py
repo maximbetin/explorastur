@@ -5,16 +5,20 @@ Base class for event scrapers.
 import logging
 import requests
 import time
+import traceback
 from bs4 import BeautifulSoup
 import re
 import datetime
-from typing import Dict, List, Optional, Any, Union, Callable, cast
+from typing import Dict, List, Optional, Any, Union, Callable, cast, TypeVar
 
 from utils import DateProcessor, TextProcessor
 from scraper_utils import parse_html, make_absolute_url
 from scrapers.config import get_default_config
 
 logger = logging.getLogger('explorastur')
+
+# Generic type for function return values
+T = TypeVar('T')
 
 class EventScraper:
     """Base class for event scrapers.
@@ -53,6 +57,50 @@ class EventScraper:
         self.retry_delay = int(self.config.get("retry_delay", default_config["retry_delay"]))
         self.headers = self.config.get("headers", default_config["headers"])
         self.max_pages = int(self.config.get("max_pages", default_config["max_pages"]))
+
+    def handle_error(self, error: Exception, context: str, return_value: T) -> T:
+        """Standard error handling for scrapers.
+
+        This method provides consistent error handling across all scrapers.
+        It logs the error with appropriate context and optionally includes a traceback.
+
+        Args:
+            error: The exception that was raised
+            context: Description of what was happening when the error occurred
+            return_value: The value to return after handling the error
+
+        Returns:
+            The provided return_value (typically an empty list for scraper methods)
+        """
+        # Log the basic error with context
+        logger.error(f"Error {context} for {self.source_name}: {error}")
+
+        # Include the full traceback for detailed debugging
+        logger.debug(f"Traceback for {context} error in {self.source_name}:\n{traceback.format_exc()}")
+
+        # Return the provided default value
+        return return_value
+
+    def safe_execute(self, func: Callable[..., T], context: str, default_return: T, *args, **kwargs) -> T:
+        """Execute a function with standardized error handling.
+
+        This is a wrapper that executes a function and handles any exceptions
+        using the standardized error handling approach.
+
+        Args:
+            func: The function to execute
+            context: Description of what the function is doing
+            default_return: Value to return if an exception occurs
+            *args: Positional arguments to pass to the function
+            **kwargs: Keyword arguments to pass to the function
+
+        Returns:
+            The function's return value or default_return if an exception occurs
+        """
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            return self.handle_error(e, context, default_return)
 
     def scrape(self) -> List[Dict[str, str]]:
         """Scrape events from the source.
@@ -242,7 +290,6 @@ class EventScraper:
                 current_page += 1
 
             except Exception as e:
-                logger.error(f"Error processing page {current_page}: {e}")
-                break
+                return self.handle_error(e, f"processing page {current_page}", all_events)
 
         return all_events
