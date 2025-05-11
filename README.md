@@ -180,7 +180,6 @@ The codebase follows these design principles:
 - [Centros Sociales](https://www.oviedo.es/centrossociales/avisos)
 - [Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
 - [Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
-- ~~[Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)~~ (Implemented)
 
 ## License
 
