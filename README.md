@@ -6,18 +6,18 @@ ExplorAstur is a minimal web scraper that finds events happening in Asturias, Sp
 
 ### Requirements
 - Python 3.13+
-- Required packages: requests, beautifulsoup4
+- Dependencies listed in requirements.txt
 
 ### Quick Start
 
 1. **Install dependencies**:
    ```bash
-   pip install requests beautifulsoup4
+   pip install -r requirements.txt
    ```
 
 2. **Run the scraper**:
    ```bash
-   python scraper.py
+   python main.py
    ```
 
 3. **View the results** in the `output` directory
@@ -29,18 +29,79 @@ The tool is extremely simple:
 2. Parses events from HTML content
 3. Organizes them into a markdown file
 
-## Project Structure
+## Date and Month Handling
 
-The project couldn't be more minimal:
+The system is designed to work with any month or year:
+
+- **Automatic date detection**: The scraper extracts date information from the event titles and descriptions, supporting various formats (single day, ranges, month-long events)
+- **Month-independent parsing**: All date processing works with any Spanish month name (enero, febrero, marzo, etc.)
+- **Current month awareness**: The system knows the current month and can handle relative date references like "todo el mes" (all month long)
+- **Chronological sorting**: Events are sorted by month and then by day, with month-long events appearing first
+
+This means the scraper will continue to work correctly throughout the year without requiring manual updates to the code when the month changes.
+
+## Project Structure
 
 ```
 explorastur/
-├── scraper.py           # The scraper code (everything in one file)
+├── main.py              # Main entry point and script execution
+├── processor.py         # Event processing logic
+├── scrapers.py          # Web scraping implementations
+├── utils.py             # Utility classes for text and date processing
+├── requirements.txt     # Python dependencies
 ├── README.md            # Documentation
 ├── logs/                # Log files (created automatically)
 └── output/              # Generated output (created automatically)
     └── events_*.md      # Markdown event listing
 ```
+
+## Architecture & Module Responsibilities
+
+### main.py
+- Program entry point
+- Configures logging
+- Creates necessary directories
+- Orchestrates the overall process flow
+- Handles errors and exceptions
+
+### utils.py
+- Houses utility classes for common operations:
+  - `DateProcessor`: Handles date parsing, formatting, and comparison
+  - `TextProcessor`: Manages text cleaning, extraction, and formatting
+
+### scrapers.py
+- Contains scraper implementations
+- Base class `EventScraper`: Defines interface for all scrapers
+- `TelecableScraper`: Implementation for Telecable blog
+- Each scraper is responsible for obtaining raw event data
+
+### processor.py
+- `EventProcessor`: Processes raw events
+  - Filters out past events
+  - Cleans and enhances data
+  - Formats events to markdown output
+
+## Data Flow
+
+1. `main.py` sets up logging and calls scrapers
+2. `scrapers.py` fetches and extracts raw events
+3. `processor.py` processes and formats events
+4. `main.py` outputs formatted events to markdown files
+
+## Code Organization
+
+The codebase follows these design principles:
+
+1. **Clear Separation of Concerns**:
+   - `main.py`: Application orchestration
+   - `utils.py`: Reusable utilities
+   - `scrapers.py`: Data acquisition
+   - `processor.py`: Data processing
+
+2. **Consistent Code Structure**:
+   - Standardized imports
+   - Consistent class structure
+   - Clear module purposes
 
 ## Troubleshooting
 
@@ -62,7 +123,6 @@ explorastur/
 [Centros Sociales](https://www.oviedo.es/centrossociales/avisos)
 [Ficx](https://ficx.tv/actividades/programa-actividades-toma-3/)
 [Yelmo Cines](https://yelmocines.es/cartelera/asturias/los-prados)
-[Blog Telecable](https://blog.telecable.es/agenda-planes-asturias/)
 [Turismo Asturias](https://www.turismoasturias.es/agenda-de-asturias)
 
 ## License
