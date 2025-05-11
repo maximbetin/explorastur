@@ -848,6 +848,9 @@ class VisitOviedoScraper(EventScraper):
 
                 date_str = f"{day_of_week.text.strip()} {day_of_month.text.strip()} de {month.text.strip()}"
 
+                # Remove the weekday name to standardize date format with other scrapers
+                date_str = re.sub(r'^(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\s+', '', date_str.strip())
+
                 # Extract all event entries for this day
                 event_entries = day_wrapper.select('div.entry')
 
