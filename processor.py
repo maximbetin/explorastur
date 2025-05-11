@@ -138,6 +138,8 @@ class EventProcessor:
                     source = 'Turismo Asturias'
                 elif 'oviedo.es/centrossociales' in url:
                     source = 'Centros Sociales Oviedo'
+                elif 'visitoviedo.info' in url:
+                    source = 'Visit Oviedo'
                 else:
                     # If the URL doesn't match known patterns, check for other known URLs
                     if (url.startswith('https://www.museobbaa.com/') or
@@ -165,7 +167,8 @@ class EventProcessor:
         source_urls = {
             'Telecable': 'https://blog.telecable.es/agenda-planes-asturias/',
             'Turismo Asturias': 'https://www.turismoasturias.es/agenda-de-asturias',
-            'Centros Sociales Oviedo': 'https://www.oviedo.es/centrossociales/avisos'
+            'Centros Sociales Oviedo': 'https://www.oviedo.es/centrossociales/avisos',
+            'Visit Oviedo': 'https://www.visitoviedo.info/agenda'
         }
 
         # Sort sources to ensure consistent order

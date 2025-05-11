@@ -741,3 +741,99 @@ class OviedoCentrosSocialesScraper(EventScraper):
                 texts.append(child.strip())
 
         return " ".join(text for text in texts if text)
+
+class VisitOviedoScraper(EventScraper):
+    """Scraper for Visit Oviedo's tourism agenda."""
+
+    def __init__(self):
+        super().__init__()
+        self.url = "https://www.visitoviedo.info/agenda"
+
+    def scrape(self):
+        """Scrape events from Visit Oviedo tourism website."""
+        events = []
+        logger.info(f"Fetching URL: {self.url}")
+
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            response = requests.get(self.url, headers=headers, timeout=30)
+            response.raise_for_status()
+            html = response.text
+        except Exception as e:
+            logger.error(f"Error fetching {self.url}: {e}")
+            return []
+
+        # Parse HTML
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+
+            # Find all day entries
+            day_entries = soup.select('div.day-entry')
+
+            for day_entry in day_entries:
+                # Extract the date information
+                day_wrapper = day_entry.select_one('div.day-wrapper')
+                if not day_wrapper:
+                    continue
+
+                day_link = day_wrapper.select_one('a.day')
+                if not day_link:
+                    continue
+
+                # Extract day, month, weekday
+                day_of_month = day_link.select_one('span.day-of-month')
+                month = day_link.select_one('span.month')
+                day_of_week = day_link.select_one('span.day-of-week')
+
+                if not (day_of_month and month and day_of_week):
+                    continue
+
+                date_str = f"{day_of_week.text.strip()} {day_of_month.text.strip()} de {month.text.strip()}"
+
+                # Extract all event entries for this day
+                event_entries = day_wrapper.select('div.entry')
+
+                for event_entry in event_entries:
+                    event_link = event_entry.select_one('a')
+                    if not event_link:
+                        continue
+
+                    title_span = event_link.select_one('span.title')
+                    hour_span = event_link.select_one('span.hour')
+                    location_span = event_link.select_one('span.location')
+
+                    if not (title_span and location_span):
+                        continue
+
+                    title = title_span.text.strip()
+                    location = location_span.text.strip().replace('marker', '').strip()
+
+                    # Add time to date if available
+                    event_date = date_str
+                    if hour_span:
+                        time_text = hour_span.text.strip().replace('Tiempo', '').strip()
+                        event_date = f"{date_str} - {time_text}"
+
+                    # Get the event URL
+                    event_url = event_link.get('href', '')
+                    if event_url and not event_url.startswith('http'):
+                        event_url = f"https://www.visitoviedo.info{event_url}"
+
+                    # Create the event
+                    event = self._create_event(
+                        title=title,
+                        date=event_date,
+                        location=location,
+                        description="",
+                        url=event_url or self.url,
+                        source="Visit Oviedo"
+                    )
+
+                    events.append(event)
+
+        except Exception as e:
+            logger.error(f"Error parsing HTML: {e}")
+            return []
+
+        logger.info(f"Successfully extracted {len(events)} events from Visit Oviedo")
+        return events
