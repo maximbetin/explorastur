@@ -22,7 +22,7 @@ class EventScraper:
         """To be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement scrape method")
 
-    def _create_event(self, title, date, location, description, url):
+    def _create_event(self, title, date, location, description, url, source=None):
         """Create a standardized event dictionary."""
         # Ensure title isn't empty
         if not title or title == ":":
@@ -33,7 +33,8 @@ class EventScraper:
             'date': date,
             'location': location,
             'description': description,
-            'url': url
+            'url': url,
+            'source': source
         }
 
 class TelecableScraper(EventScraper):
@@ -275,7 +276,8 @@ class TelecableScraper(EventScraper):
                 date=date,
                 location=location,
                 description="",  # No description as requested
-                url=url
+                url=url,
+                source="Telecable"
             )
 
         return None
@@ -472,7 +474,7 @@ class TurismoAsturiaScraper(EventScraper):
         description = ""  # No longer extracting descriptions
 
         # Create and return the event
-        return self._create_event(title, date, location, description, url)
+        return self._create_event(title, date, location, description, url, source="Turismo Asturias")
 
     def _get_spanish_month(self, month_num):
         """Get Spanish month name from month number (1-12)"""

@@ -126,16 +126,34 @@ class EventProcessor:
         # Group events by their source URL
         events_by_source = {}
         for event in events:
-            source = None
-            url = event['url']
-
-            # Determine source based on URL
-            if 'blog.telecable.es' in url:
-                source = 'Telecable'
-            elif 'turismoasturias.es' in url:
-                source = 'Turismo Asturias'
+            # Check if the event has a source field (added during scraping)
+            if 'source' in event and event['source']:
+                source = event['source']
             else:
-                source = 'Otros eventos'
+                # Fallback to URL-based detection
+                url = event['url']
+                if 'blog.telecable.es' in url:
+                    source = 'Telecable'
+                elif 'turismoasturias.es' in url:
+                    source = 'Turismo Asturias'
+                else:
+                    # If the URL doesn't match known patterns, check for other known URLs
+                    if (url.startswith('https://www.museobbaa.com/') or
+                        url.startswith('https://avilescomarca.info/') or
+                        url.startswith('https://antonionajarro.com/') or
+                        url.startswith('https://www.gijon.es/') or
+                        url.startswith('https://www.oviedo.es/') or
+                        url.startswith('https://www.instagram.com/') or
+                        url.startswith('https://www.laboralciudaddelacultura.com/') or
+                        url.startswith('https://evamcbel.com/') or
+                        url.startswith('https://www.centroniemeyer.es/') or
+                        url.startswith('https://www.facebook.com/') or
+                        url.startswith('https://www.lahuellasonora.com/') or
+                        url.startswith('https://evaristovalle.com/') or
+                        url.startswith('https://elgranmusicaldelos80y90.com/')):
+                        source = 'Telecable'
+                    else:
+                        source = 'Otros eventos'
 
             if source not in events_by_source:
                 events_by_source[source] = []
@@ -197,8 +215,6 @@ class EventProcessor:
                     # Add URL if available
                     if event['url']:
                         markdown += f"     - Link: {event['url']}\n"
-
-                    # No longer including descriptions
 
                     # Add a small gap between events with the same date
                     markdown += "\n"
