@@ -55,6 +55,12 @@ SITE_CONFIGS = {
         "url": "https://aviles.es/es/proximos-eventos",
         "enabled": True,
     },
+
+    "oviedo_announcements": {
+        "name": "Centros Sociales Oviedo",
+        "url": "https://www.oviedo.es/centrossociales/avisos",
+        "enabled": True,
+    },
 }
 
 def get_scraper_configs() -> List[Dict[str, Any]]:

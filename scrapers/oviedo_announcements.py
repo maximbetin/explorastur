@@ -44,7 +44,7 @@ class OviedoAnnouncementsScraper(EventScraper):
             for section in announcement_sections:
                 # Extract header title (section title)
                 header = section.find_previous('h3', class_='header-title')
-                if header:
+                if header and isinstance(header, Tag):
                     header_span = header.select_one('span')
                     header_text = header_span.get_text().strip() if header_span else ""
                 else:

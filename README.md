@@ -125,7 +125,7 @@ explorastur/
 │   ├── turismo_asturias.py # Turismo Asturias scraper
 │   ├── aviles.py        # Avilés scraper
 │   ├── biodevas.py      # Biodevas scraper
-│   ├── oviedo_centros_sociales.py # Oviedo social centers scraper
+│   ├── oviedo_announcements.py # Oviedo social centers announcements scraper
 │   └── visit_oviedo.py  # Visit Oviedo scraper
 ├── logs/                # Log files (created automatically)
 └── output/              # Generated output (created automatically)

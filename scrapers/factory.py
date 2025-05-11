@@ -16,12 +16,12 @@ logger = logging.getLogger('explorastur')
 
 # Map of scraper IDs to class names
 SCRAPER_CLASS_MAP = {
-    "telecable": "TelecableScraper",
-    "turismo_asturias": "TurismoAsturiaScraper",
-    "oviedo_centros_sociales": "OviedoCentrosSocialesScraper",
-    "visit_oviedo": "VisitOviedoScraper",
     "biodevas": "BiodevasScraper",
+    "telecable": "TelecableScraper",
     "aviles": "AvilesEventsScraper",
+    "visit_oviedo": "VisitOviedoScraper",
+    "turismo_asturias": "TurismoAsturiaScraper",
+    "oviedo_announcements": "OviedoAnnouncementsScraper",
 }
 
 def get_scraper_class(scraper_id: str) -> Optional[Type[EventScraper]]:
