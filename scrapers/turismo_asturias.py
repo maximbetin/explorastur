@@ -13,7 +13,7 @@ from scraper_utils import make_absolute_url
 
 logger = logging.getLogger('explorastur')
 
-class TurismoAsturiaScraper(EventScraper):
+class TurismoAsturiasScraper(EventScraper):
     """Scraper for Turismo Asturias website."""
 
     def __init__(self, config=None):
@@ -29,7 +29,7 @@ class TurismoAsturiaScraper(EventScraper):
                 base_url=self.base_url,
                 start_url=self.url,
                 extract_page_events=self._extract_events_from_page,
-                next_page_selector='ul.lfr-pagination-buttons li:not(.disabled) a:contains("Siguiente")'
+                next_page_selector='ul.lfr-pagination-buttons li:not(.disabled) a:-soup-contains("Siguiente")'
             )
         except Exception as e:
             return self.handle_error(e, "scraping Turismo Asturias events", [])

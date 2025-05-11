@@ -17,7 +17,7 @@ from scrapers.biodevas import BiodevasScraper
 from scrapers.telecable import TelecableScraper
 from scrapers.aviles import AvilesEventsScraper
 from scrapers.visit_oviedo import VisitOviedoScraper
-from scrapers.turismo_asturias import TurismoAsturiaScraper
+from scrapers.turismo_asturias import TurismoAsturiasScraper
 from scrapers.oviedo_announcements import OviedoAnnouncementsScraper
 
 # Import factory for creating scraper instances
@@ -39,7 +39,7 @@ __all__ = [
     'TelecableScraper',
     'AvilesEventsScraper',
     'VisitOviedoScraper',
-    'TurismoAsturiaScraper',
+    'TurismoAsturiasScraper',
     'OviedoAnnouncementsScraper',
 
     # Factory functions

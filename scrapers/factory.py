@@ -34,7 +34,7 @@ SCRAPER_REGISTRY = {
         "module_path": "scrapers.visit_oviedo"
     },
     "turismo_asturias": {
-        "class_name": "TurismoAsturiaScraper",
+        "class_name": "TurismoAsturiasScraper",
         "module_path": "scrapers.turismo_asturias"
     },
     "oviedo_announcements": {

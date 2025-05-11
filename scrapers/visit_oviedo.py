@@ -37,7 +37,7 @@ class VisitOviedoScraper(EventScraper):
                 base_url=self.base_url,
                 start_url=self.url,
                 extract_page_events=self._extract_week_events,
-                next_page_selector='.paginator .pager li:last-child a:contains("Siguiente")'
+                next_page_selector='.paginator .pager li:last-child a:-soup-contains("Siguiente")'
             )
         except Exception as e:
             return self.handle_error(e, "scraping Visit Oviedo events", [])

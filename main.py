@@ -17,6 +17,25 @@ from processor import EventProcessor
 os.makedirs('logs', exist_ok=True)
 os.makedirs('output', exist_ok=True)
 
+# Custom log filter to suppress pagination URLs and certain verbose messages
+class LogFilter(logging.Filter):
+    """Filter to clean up log output by removing verbose pagination URLs and other noise."""
+
+    def filter(self, record):
+        # Skip long pagination URLs
+        if "?p_p_id=" in getattr(record, 'msg', "") or "/-/calendars/week/" in getattr(record, 'msg', ""):
+            return False
+
+        # Skip verbose "Fetching page" messages in INFO mode
+        if record.levelno == logging.INFO and "Fetching page" in getattr(record, 'msg', ""):
+            return False
+
+        # Always allow ERROR and WARNING messages
+        if record.levelno in (logging.ERROR, logging.WARNING):
+            return True
+
+        return True
+
 # Configure logging
 logger = logging.getLogger('explorastur')
 logger.setLevel(logging.INFO)
@@ -25,12 +44,13 @@ if not logger.handlers:
     log_format = '[%(asctime)s] [%(levelname)s]: %(message)s'
     date_format = '%H:%M:%S'
 
-    # Add console handler
+    # Add console handler with filter
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(logging.Formatter(log_format, date_format))
+    console_handler.addFilter(LogFilter())
     logger.addHandler(console_handler)
 
-    # Add file handler
+    # Add file handler (keep all details in the file)
     today = datetime.datetime.now().strftime('%Y-%m-%d')
     log_file = f'logs/explorastur_{today}.log'
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
@@ -66,6 +86,14 @@ def parse_args():
         default=False
     )
 
+    parser.add_argument(
+        "--verbose", "-v",
+        dest="verbose",
+        action="store_true",
+        help="Show all log messages including pagination details",
+        default=False
+    )
+
     return parser.parse_args()
 
 def main():
@@ -82,6 +110,16 @@ def main():
     if args.debug:
         logger.setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")
+
+    # If verbose mode is requested, remove the filter
+    if args.verbose:
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                handler.removeFilter(LogFilter())
+                if args.debug:
+                    logger.debug("Verbose logging enabled")
+                else:
+                    logger.info("Verbose logging enabled")
 
     logger.info("Starting ExplorAstur - Event scrapers")
     all_events = []

@@ -122,9 +122,27 @@ class EventScraper:
         Returns:
             HTML content string or None if all retries failed
         """
+        # Create a simplified URL for logging
+        # Extract domain and path for cleaner logs
+        simple_url = url
+        if len(url) > 60:  # Only simplify long URLs
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                path = parsed.path if parsed.path else "/"
+                simple_url = f"{parsed.netloc}{path}"
+                if len(simple_url) > 60:
+                    simple_url = f"{simple_url[:57]}..."
+            except:
+                # If parsing fails, use a basic truncation
+                simple_url = f"{url[:57]}..."
+
         for attempt in range(1, self.max_retries + 1):
             try:
                 logger.debug(f"Fetching URL (attempt {attempt}/{self.max_retries}): {url}")
+                if attempt > 1:
+                    logger.info(f"Retry attempt {attempt}/{self.max_retries} for {simple_url}")
+
                 response = requests.get(
                     url,
                     headers=self.headers,
@@ -134,19 +152,41 @@ class EventScraper:
                 if response.status_code == 200:
                     return response.text
 
-                logger.warning(f"Failed to fetch URL: {url}, status code: {response.status_code}")
-
-                # If not a 5XX error, don't retry
-                if response.status_code < 500 or response.status_code >= 600:
+                # Log an appropriate warning based on status code
+                if 400 <= response.status_code < 500:
+                    logger.warning(f"Client error: Failed to fetch {simple_url}, status code: {response.status_code}")
+                    # For 4XX client errors, only retry 429 (Too Many Requests)
+                    if response.status_code != 429:
+                        logger.debug(f"Not retrying client error {response.status_code} for URL: {url}")
+                        break
+                elif 500 <= response.status_code < 600:
+                    logger.warning(f"Server error: Failed to fetch {simple_url}, status code: {response.status_code}")
+                    # 5XX errors are worth retrying as they are often temporary
+                    pass
+                else:
+                    logger.warning(f"Unexpected status code: {response.status_code} for {simple_url}")
                     break
 
+            except requests.exceptions.Timeout:
+                logger.warning(f"Timeout error (attempt {attempt}/{self.max_retries}) for {simple_url}")
+            except requests.exceptions.ConnectionError:
+                logger.warning(f"Connection error (attempt {attempt}/{self.max_retries}) for {simple_url}")
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Request error (attempt {attempt}/{self.max_retries}) for {simple_url}")
+                logger.debug(f"Request error details: {e}")
             except Exception as e:
-                logger.warning(f"Error fetching URL (attempt {attempt}/{self.max_retries}): {url}, error: {e}")
+                logger.warning(f"Unexpected error (attempt {attempt}/{self.max_retries}) for {simple_url}")
+                logger.debug(f"Error details: {e}")
 
             # Wait before retrying (except on last attempt)
             if attempt < self.max_retries:
-                time.sleep(self.retry_delay)
+                # Use exponential backoff for retries
+                delay = self.retry_delay * (2 ** (attempt - 1))
+                logger.debug(f"Waiting {delay} seconds before retry {attempt+1}/{self.max_retries}")
+                time.sleep(delay)
 
+        logger.error(f"Failed to fetch {simple_url} after {self.max_retries} attempts")
+        logger.debug(f"Failed URL: {url}")
         return None
 
     def fetch_and_parse(self, url: str) -> Optional[BeautifulSoup]:
@@ -248,12 +288,15 @@ class EventScraper:
         current_url = start_url
 
         while current_page <= pages_to_fetch:
-            logger.info(f"Fetching page {current_page}: {current_url}")
+            # Use a simplified log message for cleaner output
+            # Only include the full URL in debug mode
+            logger.debug(f"Fetching page {current_page}: {current_url}")
+            logger.info(f"Processing page {current_page}")
 
             # Fetch and parse the page
             soup = self.fetch_and_parse(current_url)
             if not soup:
-                logger.error(f"Failed to fetch or parse page {current_page}: {current_url}")
+                logger.error(f"Failed to fetch or parse page {current_page}")
                 break
 
             # Extract events from this page

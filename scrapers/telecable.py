@@ -54,7 +54,6 @@ class TelecableScraper(EventScraper):
 
             # Extract categories and their events
             events = []
-            categories = {}
             current_category = "General"
 
             # Find all h2 headers (category headers) and p tags (event details)
@@ -62,7 +61,7 @@ class TelecableScraper(EventScraper):
                 if element.name == 'h2':
                     # Start a new category
                     current_category = element.get_text().strip()
-                    logger.info(f"Found category: {current_category}")
+                    logger.debug(f"Processing category: {current_category}")
 
                 elif element.name == 'p':
                     # Look for paragraphs that start with bold text (typically event titles)
@@ -106,7 +105,8 @@ class TelecableScraper(EventScraper):
                             if event:
                                 events.append(event)
 
-            logger.info(f"Found {len(events)} events in {len(categories)} categories")
+            # Just log the total number of events found
+            logger.debug(f"Processed {len(events)} events from Telecable blog")
             return events
 
         except Exception as e:
