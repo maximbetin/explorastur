@@ -11,7 +11,7 @@ import datetime
 from typing import Dict, List, Optional, Any, Union, Callable
 
 from utils import DateProcessor, TextProcessor
-from scraper_utils import fetch_page, parse_html, make_absolute_url
+from scraper_utils import parse_html, make_absolute_url
 
 logger = logging.getLogger('explorastur')
 

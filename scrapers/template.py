@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup, Tag
 from typing import Dict, List, Optional, Any, Union
 
 from scrapers.base import EventScraper
+from scraper_utils import make_absolute_url
 
 logger = logging.getLogger('explorastur')
 
@@ -88,7 +89,7 @@ class TemplateScraper(EventScraper):
                     if href and isinstance(href, str) and href.startswith(('http://', 'https://')):
                         url = href
                     elif href and isinstance(href, str):
-                        url = self._make_absolute_url(self.url, href)
+                        url = make_absolute_url(self.url, href)
 
                 # If no URL was found, use the main page URL
                 if not url:
@@ -114,38 +115,3 @@ class TemplateScraper(EventScraper):
             import traceback
             logger.error(traceback.format_exc())
             return []
-
-    def _make_absolute_url(self, base_url: str, relative_url: str) -> str:
-        """Make a relative URL absolute.
-
-        Args:
-            base_url: The base URL of the website
-            relative_url: A relative URL
-
-        Returns:
-            Absolute URL
-        """
-        # Remove fragment identifier
-        if '#' in base_url:
-            base_url = base_url.split('#')[0]
-
-        # If it already starts with http, it's already absolute
-        if relative_url.startswith(('http://', 'https://')):
-            return relative_url
-
-        # If it starts with a slash, append to the domain
-        if relative_url.startswith('/'):
-            # Extract domain from base_url
-            from urllib.parse import urlparse
-            parsed_base = urlparse(base_url)
-            domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
-            return domain + relative_url
-
-        # Otherwise, it's relative to the current path
-        # Remove the filename from the base_url if present
-        if base_url.endswith('/'):
-            return base_url + relative_url
-        else:
-            # Remove last path component
-            base_url = base_url.rsplit('/', 1)[0] + '/'
-            return base_url + relative_url

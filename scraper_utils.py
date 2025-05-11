@@ -6,29 +6,10 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 import re
+from urllib.parse import urlparse
 from typing import Dict, List, Optional, Union, Any, Tuple
 
 logger = logging.getLogger('explorastur')
-
-def fetch_page(url: str, timeout: int = 30) -> Optional[str]:
-    """
-    Fetch a webpage and return its HTML content.
-
-    Args:
-        url: The URL to fetch
-        timeout: Request timeout in seconds
-
-    Returns:
-        HTML content as string or None if request failed
-    """
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(url, headers=headers, timeout=timeout)
-        response.raise_for_status()
-        return response.text
-    except Exception as e:
-        logger.error(f"Error fetching {url}: {e}")
-        return None
 
 def parse_html(html: str) -> Optional[BeautifulSoup]:
     """
@@ -89,13 +70,29 @@ def make_absolute_url(base_url: str, relative_url: str) -> str:
     if not relative_url:
         return base_url
 
-    if relative_url.startswith('http'):
+    # Remove fragment identifier from base_url
+    if '#' in base_url:
+        base_url = base_url.split('#')[0]
+
+    # If it already starts with http, it's already absolute
+    if relative_url.startswith(('http://', 'https://')):
         return relative_url
 
+    # If it starts with a slash, append to the domain
     if relative_url.startswith('/'):
-        return f"{base_url}{relative_url}"
+        # Extract domain from base_url
+        parsed_base = urlparse(base_url)
+        domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
+        return domain + relative_url
+
+    # Otherwise, it's relative to the current path
+    # Remove the filename from the base_url if present
+    if base_url.endswith('/'):
+        return base_url + relative_url
     else:
-        return f"{base_url}/{relative_url}"
+        # Remove last path component
+        base_url = base_url.rsplit('/', 1)[0] + '/'
+        return base_url + relative_url
 
 def extract_date_from_text(text: str) -> str:
     """
