@@ -13,30 +13,29 @@ from bs4 import BeautifulSoup, Tag
 logger = logging.getLogger('explorastur')
 
 # Constants
-SPANISH_MONTHS_LOWER = [
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-]
-
-SPANISH_MONTHS_CAPITAL = [
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-]
-
-# Map of month numbers to names
-SPANISH_MONTHS_MAP = {
-    1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
-    5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
-    9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+MONTHS = {
+    'lower': [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    ],
+    'capital': [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ],
+    'map': {
+        1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
+        5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
+        9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+    }
 }
 
 # Regex patterns for date extraction
 DATE_PATTERNS = {
-    'single_day': r'(\d{1,2})\s+de\s+(' + r'|'.join(SPANISH_MONTHS_LOWER) + r')',
-    'range': r'(\d{1,2})\s*[-/]\s*(\d{1,2})\s+de\s+(' + r'|'.join(SPANISH_MONTHS_LOWER) + r')',
-    'month_long': r'(todo\s+el\s+mes|durante\s+todo\s+el\s+mes)(\s+de\s+(' + r'|'.join(SPANISH_MONTHS_LOWER) + r'))?',
-    'del_al': r'[Dd]el\s+(\d{1,2})\s+al\s+(\d{1,2})\s+de\s+(' + r'|'.join(SPANISH_MONTHS_LOWER) + r')',
-    'with_time': r'(\d{1,2})\s+de\s+(' + r'|'.join(SPANISH_MONTHS_LOWER) + r')\s+a\s+las\s+(\d{1,2}):(\d{2})'
+    'single_day': r'(\d{1,2})\s+de\s+(' + r'|'.join(MONTHS['lower']) + r')',
+    'range': r'(\d{1,2})\s*[-/]\s*(\d{1,2})\s+de\s+(' + r'|'.join(MONTHS['lower']) + r')',
+    'month_long': r'(todo\s+el\s+mes|durante\s+todo\s+el\s+mes)(\s+de\s+(' + r'|'.join(MONTHS['lower']) + r'))?',
+    'del_al': r'[Dd]el\s+(\d{1,2})\s+al\s+(\d{1,2})\s+de\s+(' + r'|'.join(MONTHS['lower']) + r')',
+    'with_time': r'(\d{1,2})\s+de\s+(' + r'|'.join(MONTHS['lower']) + r')\s+a\s+las\s+(\d{1,2}):(\d{2})'
 }
 
 # Time patterns
@@ -63,13 +62,13 @@ class DateProcessor:
     def get_current_month_year() -> str:
         """Get the current month name in Spanish with first letter capitalized."""
         now = datetime.datetime.now()
-        return SPANISH_MONTHS_CAPITAL[now.month - 1]
+        return MONTHS['capital'][now.month - 1]
 
     @staticmethod
     def get_current_month_name() -> str:
         """Get just the current month name in Spanish (lowercase)."""
         now = datetime.datetime.now()
-        return SPANISH_MONTHS_LOWER[now.month - 1]
+        return MONTHS['lower'][now.month - 1]
 
     @staticmethod
     def extract_days_from_range(date_pattern: str) -> List[int]:
@@ -87,27 +86,34 @@ class DateProcessor:
             return []
 
         day_numbers = []
+        patterns = {
+            'single_days': r'(\d+)(?=\s+de\s+[a-zA-Z]+)',
+            'day_ranges': r'(\d+)-(\d+)(?=\s+de\s+[a-zA-Z]+)',
+            'a_ranges': r'(\d+)\s+a\s+(\d+)(?=\s+de\s+[a-zA-Z]+)',
+            'y_days': r'(\d+)(?=\s+y\s+\d+)',
+            'del_al': r'del\s+(\d+)\s+al\s+(\d+)'
+        }
 
         # Match single days: "10 de mayo"
-        single_days = re.findall(r'(\d+)(?=\s+de\s+[a-zA-Z]+)', date_pattern)
+        single_days = re.findall(patterns['single_days'], date_pattern)
         day_numbers.extend([int(day) for day in single_days])
 
         # Match day ranges: "10-15 de mayo"
-        day_ranges = re.findall(r'(\d+)-(\d+)(?=\s+de\s+[a-zA-Z]+)', date_pattern)
+        day_ranges = re.findall(patterns['day_ranges'], date_pattern)
         for start, end in day_ranges:
             day_numbers.extend(range(int(start), int(end) + 1))
 
         # Match 'a' ranges: "9 a 18 de mayo"
-        a_ranges = re.findall(r'(\d+)\s+a\s+(\d+)(?=\s+de\s+[a-zA-Z]+)', date_pattern)
+        a_ranges = re.findall(patterns['a_ranges'], date_pattern)
         for start, end in a_ranges:
             day_numbers.extend(range(int(start), int(end) + 1))
 
         # Match separated ranges: "10 y 15 de mayo"
-        y_days = re.findall(r'(\d+)(?=\s+y\s+\d+)', date_pattern)
+        y_days = re.findall(patterns['y_days'], date_pattern)
         day_numbers.extend([int(day) for day in y_days])
 
         # Look for additional formats: "del 10 al 15"
-        del_al_match = re.search(r'del\s+(\d+)\s+al\s+(\d+)', date_pattern)
+        del_al_match = re.search(patterns['del_al'], date_pattern)
         if del_al_match:
             start, end = del_al_match.groups()
             day_numbers.extend(range(int(start), int(end) + 1))
@@ -125,7 +131,6 @@ class DateProcessor:
         """
         Determine if an event is in the future based on its date pattern.
         Returns True if it's a month-long event or any day in the range is >= current_date.
-        Works with any month name, not just specific to a specific month.
 
         Args:
             date_pattern: The date string to analyze
@@ -137,7 +142,7 @@ class DateProcessor:
         current_month = datetime.datetime.now().month - 1  # 0-indexed for list
 
         # Check if date refers to a future month
-        for i, month in enumerate(SPANISH_MONTHS_LOWER):
+        for i, month in enumerate(MONTHS['lower']):
             if month in date_pattern.lower():
                 if i > current_month:
                     return True
@@ -172,7 +177,7 @@ class DateProcessor:
         month_index = datetime.datetime.now().month - 1  # 0-indexed
 
         # Try to find month in the date string
-        for i, month in enumerate(SPANISH_MONTHS_LOWER):
+        for i, month in enumerate(MONTHS['lower']):
             if month in date_str.lower():
                 month_index = i
                 break
@@ -223,24 +228,19 @@ class DateProcessor:
         if not text:
             return ""
 
-        # Pattern for times like "19:00" or "7:30"
-        time_match = re.search(TIME_PATTERNS['standard'], text)
-        if time_match:
-            return time_match.group(0)
-
-        # Pattern for times with 'h' like "19h30" or "19h"
-        hour_match = re.search(TIME_PATTERNS['with_h'], text, re.IGNORECASE)
-        if hour_match:
-            hour = hour_match.group(1)
-            minute = hour_match.group(2) or "00"
-            return f"{hour}:{minute}"
-
-        # Look for times mentioned with 'a las'
-        a_las_match = re.search(TIME_PATTERNS['with_a_las'], text, re.IGNORECASE)
-        if a_las_match:
-            hour = a_las_match.group(1)
-            minute = a_las_match.group(2) or "00"
-            return f"{hour}:{minute}"
+        for pattern_name, pattern in TIME_PATTERNS.items():
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                if pattern_name == 'standard':
+                    return match.group(0)
+                elif pattern_name == 'with_h':
+                    hour = match.group(1)
+                    minute = match.group(2) or "00"
+                    return f"{hour}:{minute}"
+                elif pattern_name == 'with_a_las':
+                    hour = match.group(1)
+                    minute = match.group(2) or "00"
+                    return f"{hour}:{minute}"
 
         return ""
 
@@ -275,28 +275,26 @@ class DateProcessor:
         Returns:
             Spanish month name or empty string if invalid month number
         """
-        return SPANISH_MONTHS_MAP.get(month_num, "")
+        return MONTHS['map'].get(month_num, "")
 
 
 class TextProcessor:
     """Class to handle text cleaning and processing."""
 
-    # Common Spanish venue words
+    # Common Spanish venue words and location data
     VENUE_WORDS = [
         "Teatro", "Auditorio", "Sala", "Centro", "Pabellón",
         "Plaza", "Factoría", "Recinto", "Museo"
     ]
 
-    # Common Spanish city names
     CITY_NAMES = ["Oviedo", "Gijón", "Avilés", "Langreo", "Mieres", "Siero", "Lugones"]
 
-    # Patterns for non-event titles
+    # Patterns for filtering and cleaning
     NON_EVENT_PATTERNS = [
         r'agenda', r'asturias en [a-z]+', r'¿quieres saber',
         r'planes', r'vamos allá'
     ]
 
-    # Date prefix patterns to remove from titles
     DATE_PREFIX_PATTERNS = [
         r'^Hasta el \d+ de [a-zA-Z]+',
         r'^Durante todo el mes de [a-zA-Z]+',
@@ -304,12 +302,21 @@ class TextProcessor:
         r'^\d+-\d+ de [a-zA-Z]+'
     ]
 
-    # Small words that should be lowercase in titles unless they're the first word
     SMALL_WORDS = [
         'a', 'e', 'o', 'y', 'u', 'de', 'la', 'el', 'del', 'los', 'las',
         'en', 'con', 'por', 'para', 'al', 'su', 'sus', 'tu', 'tus',
         'mi', 'mis', 'un', 'una', 'unos', 'unas', 'lo', 'que'
     ]
+
+    # Location-specific replacements
+    SPECIFIC_LOCATIONS = {
+        "El Atrio": "Centro Comercial 'El Atrio' (C/ Cámara, Cuba, Dr.), Avilés",
+        "La Florida con": "Centro Social La Florida, Oviedo",
+        "Factoría Cultural": "Factoría Cultural, Avilés",
+        "NIEMEYER": "Centro Niemeyer, Avilés",
+        "Plaza": "Plaza de Asturias, Oviedo",
+        "Centro Social": "Centro Social de Oviedo"
+    }
 
     @staticmethod
     def clean_title(title: str, date_pattern: Optional[str] = None, fix_capitalization: bool = False) -> str:
@@ -342,22 +349,8 @@ class TextProcessor:
         for prefix in TextProcessor.DATE_PREFIX_PATTERNS:
             title = re.sub(prefix, '', title)
 
-        # Fix malformed quotes in titles
-        if title.startswith('"') and '"' not in title[1:]:
-            title = title[1:].strip()
-        if title.startswith('"') and title.endswith('"'):
-            title = title[1:-1].strip()
-        elif title.startswith('"'):
-            title = title[1:].strip()
-        elif title.endswith('"'):
-            title = title[:-1].strip()
-
-        # Fix dangling quotes in the middle of titles
-        if '"' in title and title.count('"') == 1:
-            title = title.replace('"', '')
-
-        # Remove any remaining quotes anywhere in the title
-        title = title.replace('"', '')
+        # Fix quotes in titles
+        title = TextProcessor._fix_quotes(title)
 
         # Remove "Ver evento" prefix
         title = re.sub(r'^Ver evento\s+', '', title)
@@ -378,6 +371,28 @@ class TextProcessor:
         # Fix capitalization if requested
         if fix_capitalization:
             title = TextProcessor._fix_title_capitalization(title)
+
+        return title
+
+    @staticmethod
+    def _fix_quotes(title: str) -> str:
+        """Fix malformed quotes in titles."""
+        # Handle starting quotes
+        if title.startswith('"') and '"' not in title[1:]:
+            title = title[1:].strip()
+        if title.startswith('"') and title.endswith('"'):
+            title = title[1:-1].strip()
+        elif title.startswith('"'):
+            title = title[1:].strip()
+        elif title.endswith('"'):
+            title = title[:-1].strip()
+
+        # Fix dangling quotes in the middle of titles
+        if '"' in title and title.count('"') == 1:
+            title = title.replace('"', '')
+
+        # Remove any remaining quotes anywhere in the title
+        title = title.replace('"', '')
 
         return title
 
@@ -577,23 +592,14 @@ class TextProcessor:
         location = TextProcessor._apply_formatting_fixes(location)
 
         # Handle specific location patterns
-        specific_locations = {
-            "El Atrio": "Centro Comercial 'El Atrio' (C/ Cámara, Cuba, Dr.), Avilés" if "Cuba" in location else location,
-            "La Florida con": "Centro Social La Florida, Oviedo",
-            "Factoría Cultural": "Factoría Cultural, Avilés",
-            "NIEMEYER": "Centro Niemeyer, Avilés"
-        }
-
-        # Check for specific location patterns
-        for pattern, replacement in specific_locations.items():
+        for pattern, replacement in TextProcessor.SPECIFIC_LOCATIONS.items():
             if pattern in location:
+                # Special case for El Atrio
+                if pattern == "El Atrio" and "Cuba" not in location:
+                    continue
                 return replacement
 
-        # Handle truncated locations
-        if location.strip() == 'Plaza':
-            return 'Plaza de Asturias, Oviedo'
-        if location.strip() == 'Centro Social':
-            return 'Centro Social de Oviedo'
+        # Handle truncated locations with Centro Social
         if 'Centro Social' in location and len(location.strip()) < 20:
             return f"{location}, Oviedo"
 
@@ -691,11 +697,7 @@ class UrlUtils:
             return base_url
 
         # Make URL absolute if needed
-        href_str = str(href)  # Ensure href is a string
-        if href_str.startswith(('http://', 'https://')):
-            return href_str
-        else:
-            return UrlUtils.make_absolute_url(base_url, href_str)
+        return UrlUtils.normalize_url(href, base_url)
 
     @staticmethod
     def extract_url_from_onclick(element: Any, base_url: str, pattern: str = r"'([^']+)'") -> str:
@@ -724,12 +726,25 @@ class UrlUtils:
             return base_url
 
         href = match.group(1)
+        return UrlUtils.normalize_url(href, base_url)
 
+    @staticmethod
+    def normalize_url(url: str, base_url: str) -> str:
+        """
+        Normalize a URL, ensuring it's absolute.
+
+        Args:
+            url: The URL to normalize
+            base_url: The base URL to use for relative URLs
+
+        Returns:
+            Normalized absolute URL
+        """
         # Make URL absolute if needed
-        if href.startswith(('http://', 'https://')):
-            return href
+        if url.startswith(('http://', 'https://')):
+            return url
         else:
-            return UrlUtils.make_absolute_url(base_url, href)
+            return UrlUtils.make_absolute_url(base_url, url)
 
     @staticmethod
     def get_hostname(url: str) -> str:
@@ -804,6 +819,15 @@ class HtmlUtils:
 class EventUtils:
     """Class for handling event extraction and processing."""
 
+    # Default fields for event data
+    DEFAULT_EVENT_FIELDS = {
+        'title': '',
+        'date': '',
+        'location': '',
+        'url': '',
+        'description': ''
+    }
+
     @staticmethod
     def extract_common_event_data(container: Tag, selectors: Dict[str, str], base_url: str) -> Dict[str, str]:
         """
@@ -817,13 +841,9 @@ class EventUtils:
         Returns:
             Dictionary with extracted event data
         """
-        data = {
-            'title': '',
-            'date': '',
-            'location': '',
-            'url': base_url,
-            'description': ''
-        }
+        # Initialize with default values
+        data = EventUtils.DEFAULT_EVENT_FIELDS.copy()
+        data['url'] = base_url  # Set default URL to base_url
 
         # Process each field if selector exists
         for field in data.keys():
@@ -840,8 +860,7 @@ class EventUtils:
             if field == 'url' and element.name == 'a' and element.has_attr('href'):
                 href = element['href']
                 if href:
-                    href_str = str(href)
-                    data['url'] = UrlUtils.make_absolute_url(base_url, href_str)
+                    data['url'] = UrlUtils.normalize_url(str(href), base_url)
             else:
                 # For text fields
                 data[field] = element.get_text().strip()
@@ -878,15 +897,15 @@ class EventUtils:
             if not next_link or 'href' not in next_link.attrs:
                 break
 
-            # Get next page URL and ensure it's a string
-            href = str(next_link['href'])
-            next_url = UrlUtils.make_absolute_url(base_url, href)
+            # Get next page URL and fetch it
+            next_url = UrlUtils.normalize_url(str(next_link['href']), base_url)
 
             # Fetch next page
             logger.info(f"Fetching next page: {next_url}")
             try:
                 response = requests.get(next_url)
                 if response.status_code != 200:
+                    logger.warning(f"Failed to fetch page {page_count + 1}, status code: {response.status_code}")
                     break
 
                 current_page = BeautifulSoup(response.text, 'html.parser')

@@ -23,9 +23,6 @@ from scrapers.oviedo_announcements import OviedoAnnouncementsScraper
 # Import factory for creating scraper instances
 from scrapers.factory import create_scraper, create_all_scrapers, register_scraper
 
-# Import consistency checking utilities
-from scrapers.consistency_checker import check_all_scrapers, check_scraper_consistency
-
 # Set up module logger
 logger = logging.getLogger('explorastur.scrapers')
 
@@ -51,10 +48,6 @@ __all__ = [
     'get_available_scrapers',
     'run_scraper',
     'run_all_scrapers',
-
-    # Consistency checking utilities
-    'check_all_scrapers',
-    'check_scraper_consistency',
 ]
 
 def get_available_scrapers() -> List[str]:
