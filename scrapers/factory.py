@@ -8,15 +8,15 @@ based on configuration.
 import logging
 import importlib
 import traceback
-from typing import Dict, Any, List, Type, Optional, Tuple, cast
+from typing import Dict, List, Type, Optional, Tuple, cast, Any
 
 from scrapers.base import EventScraper
-from scrapers.config import get_scraper_configs, get_config_for_scraper
+from scrapers.config import get_scraper_configs, get_config_for_scraper, ScraperConfig, register_config
 
 logger = logging.getLogger('explorastur')
 
 # Map of scraper IDs to class names and module paths
-SCRAPER_REGISTRY = {
+SCRAPER_REGISTRY: Dict[str, Dict[str, str]] = {
     "biodevas": {
         "class_name": "BiodevasScraper",
         "module_path": "scrapers.biodevas"
@@ -53,6 +53,10 @@ def get_scraper_class(scraper_id: str) -> Optional[Type[EventScraper]]:
     Returns:
         Scraper class or None if not found
     """
+    if not scraper_id:
+        logger.error("Empty scraper_id provided")
+        return None
+
     if scraper_id not in SCRAPER_REGISTRY:
         logger.error(f"No scraper registration found for ID: {scraper_id}")
         return None
@@ -83,6 +87,10 @@ def create_scraper(scraper_id: str) -> Optional[EventScraper]:
     Returns:
         Scraper instance or None if creation failed
     """
+    if not scraper_id:
+        logger.error("Empty scraper_id provided")
+        return None
+
     scraper_class = get_scraper_class(scraper_id)
     if not scraper_class:
         return None
@@ -100,6 +108,9 @@ def create_scraper(scraper_id: str) -> Optional[EventScraper]:
             return None
 
         return scraper
+    except ValueError as e:
+        logger.error(f"Configuration error for scraper {scraper_id}: {e}")
+        return None
     except Exception as e:
         logger.error(f"Error creating scraper for {scraper_id}: {e}")
         logger.debug(f"Creation traceback: {traceback.format_exc()}")
@@ -112,7 +123,7 @@ def create_all_scrapers() -> List[Tuple[str, EventScraper]]:
     Returns:
         List of tuples containing (name, scraper_instance)
     """
-    scrapers = []
+    scrapers: List[Tuple[str, EventScraper]] = []
     configs = get_scraper_configs()
 
     for config in configs:
@@ -131,7 +142,8 @@ def create_all_scrapers() -> List[Tuple[str, EventScraper]]:
 def register_scraper(
     scraper_id: str,
     class_name: str,
-    module_path: str
+    module_path: str,
+    config: Optional[Dict[str, Any]] = None
 ) -> bool:
     """
     Register a new scraper type.
@@ -143,10 +155,16 @@ def register_scraper(
         scraper_id: Unique identifier for the scraper
         class_name: Name of the scraper class
         module_path: Full module path to the scraper
+        config: Optional configuration for the scraper
 
     Returns:
         True if registration was successful, False otherwise
     """
+    # Validate inputs
+    if not scraper_id or not class_name or not module_path:
+        logger.error("Missing required parameters for scraper registration")
+        return False
+
     if scraper_id in SCRAPER_REGISTRY:
         logger.warning(f"Scraper ID '{scraper_id}' already registered. Skipping.")
         return False
@@ -156,6 +174,10 @@ def register_scraper(
         "class_name": class_name,
         "module_path": module_path
     }
+
+    # Register configuration if provided
+    if config:
+        register_config(scraper_id, config)
 
     # Verify it can be imported
     try:
