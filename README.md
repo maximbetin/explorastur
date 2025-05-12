@@ -52,12 +52,12 @@ The tool is extremely simple:
 
 ## Current Event Sources
 
+- **[Avilés](https://www.avilescomarca.info/agenda)**: Events from Avilés
+- **[Biodevas](https://biodevas.es/agenda-biodevas/)**: Biodevas community events
 - **[Telecable Blog](https://blog.telecable.es/agenda-planes-asturias/)**: A monthly article with event listings
+- **[Visit Oviedo](https://www.visitoviedo.info/Oviedo/Oviedo-hoy-agenda)**: Events from Oviedo's official tourism website
 - **[Turismo Asturias](https://www.turismoasturias.es/agenda)**: The official tourism website for Asturias with pagination support
 - **[Centros Sociales Oviedo](https://www.oviedo.es/agenda-municipal/buscador-de-actividades-en-centros-sociales)**: Events from Oviedo's network of social centers
-- **[Visit Oviedo](https://www.visitoviedo.info/Oviedo/Oviedo-hoy-agenda)**: Events from Oviedo's official tourism website
-- **[Biodevas](https://biodevas.es/agenda-biodevas/)**: Biodevas community events
-- **[Avilés](https://www.avilescomarca.info/agenda)**: Events from Avilés
 
 ## Features
 
