@@ -8,8 +8,8 @@ import datetime
 from bs4 import BeautifulSoup, Tag
 from typing import Dict, List, Optional, Any, Union
 
-from scrapers.base import EventScraper
-from scraper_utils import make_absolute_url
+from utils import UrlUtils
+from .base import EventScraper
 
 logger = logging.getLogger('explorastur')
 
@@ -61,7 +61,7 @@ class TurismoAsturiasScraper(EventScraper):
                 return None
 
             relative_url = link_element.get('href', '')
-            event_url = make_absolute_url(self.base_url, relative_url)
+            event_url = UrlUtils.make_absolute_url(self.base_url, relative_url)
 
             # Extract title from card-title element
             title_element = card.select_one('.card-title')
@@ -79,8 +79,8 @@ class TurismoAsturiasScraper(EventScraper):
                 location_text = ""
                 for item in location_element.contents:
                     if isinstance(item, Tag):
-                        item_class = item.get("class", [])
-                        if isinstance(item_class, list) and "fa-map-marker-alt" in item_class:
+                        # Check if this tag has the map marker class
+                        if "fa-map-marker-alt" in (item.get("class") or []):
                             continue
                     if isinstance(item, str) and item.strip():
                         location_text += item.strip()

@@ -14,11 +14,13 @@ Do not modify this template directly - it's meant to be copied.
 """
 
 import logging
+import re
 from typing import Dict, List, Optional, Any, cast
 from bs4 import BeautifulSoup, Tag
+from datetime import datetime
 
+from utils import UrlUtils
 from scrapers.base import EventScraper
-from scraper_utils import make_absolute_url
 
 logger = logging.getLogger('explorastur')
 
@@ -141,7 +143,7 @@ class TemplateScraper(EventScraper):
 
             # Make URL absolute if it's relative
             if event_url and not event_url.startswith(('http://', 'https://')):
-                event_url = make_absolute_url(self.base_url, event_url)
+                event_url = UrlUtils.make_absolute_url(self.base_url, event_url)
 
             # Extract date
             date_element = container.select_one('.event-date')

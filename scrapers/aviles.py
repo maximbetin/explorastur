@@ -8,8 +8,8 @@ import datetime
 from bs4 import BeautifulSoup
 from typing import Dict, List, Optional, Any
 
-from scrapers.base import EventScraper
-from scraper_utils import make_absolute_url
+from utils import UrlUtils
+from .base import EventScraper
 
 logger = logging.getLogger('explorastur')
 

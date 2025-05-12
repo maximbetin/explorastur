@@ -76,7 +76,7 @@ class EventProcessor:
 
         # Clean up the location field
         if event.get('location'):
-            event['location'] = self._clean_location(event['location'])
+            event['location'] = self.text_processor.clean_location(event['location'])
 
     def _fix_centro_social_location(self, event):
         """
@@ -102,160 +102,6 @@ class EventProcessor:
         # Add Oviedo to Centro Social locations without full name
         elif 'Centro Social' in location and len(location) < 25 and 'Oviedo' not in location:
             event['location'] = f"{location.strip()}, Oviedo"
-
-    def _clean_location(self, location):
-        """
-        Clean up location text to extract just the venue and city.
-
-        Args:
-            location (str): Raw location text
-
-        Returns:
-            str: Cleaned location text
-        """
-        if not location:
-            return ""
-
-        # Replace line breaks with spaces
-        location = re.sub(r'[\r\n]+', ' ', location)
-
-        # Fix formatting issues
-        location = self._fix_formatting_issues(location)
-
-        # Handle specific location patterns
-        location = self._handle_specific_locations(location)
-
-        # Clean up excessive commas and spacing in addresses
-        location = re.sub(r',\s*,', ',', location)
-        location = re.sub(r'\s+', ' ', location)
-
-        # Extract venue and city or truncate if too long
-        location = self._extract_venue_and_city(location)
-
-        return location.strip()
-
-    def _fix_formatting_issues(self, location):
-        """
-        Fix common formatting issues in location text.
-
-        Args:
-            location (str): Location text to fix
-
-        Returns:
-            str: Location with fixed formatting
-        """
-        # Fix concatenated words
-        location = re.sub(r'([a-z])([A-Z])', r'\1 \2', location)
-
-        # Fix missing spaces after punctuation
-        location = re.sub(r'([a-zA-Z])\.([A-Z])', r'\1. \2', location)
-        location = re.sub(r'([a-zA-Z]),([A-Z])', r'\1, \2', location)
-        location = re.sub(r'([a-zA-Z])"([a-zA-Z])', r'\1" \2', location)
-
-        # Fix specific concatenation issues
-        prefixes = ['la', 'el', 'de', 'del', 'un']
-        for prefix in prefixes:
-            location = re.sub(fr'{prefix}([A-Z])', fr'{prefix} \1', location)
-
-        # Remove common Spanish prefixes
-        location = re.sub(r'^en\s+(?:el|la|los|las)\s+', '', location)
-        location = re.sub(r'^en\s+', '', location)
-
-        # Fix special case patterns
-        location = re.sub(r'el día$', '', location)
-        location = re.sub(r'con la banda.*$', '', location)
-        location = re.sub(r'para presentar.*$', '', location)
-
-        # Fix "Dr," which should be "Dr." in addresses
-        location = re.sub(r'Dr,', 'Dr.', location)
-
-        # Fix Address format issues
-        location = re.sub(r'C/ ([^,]+), ([^,]+), ([^,]+)$', r'C/ \1, \2, \3', location)
-
-        return location
-
-    def _handle_specific_locations(self, location):
-        """
-        Handle specific location patterns.
-
-        Args:
-            location (str): Location text
-
-        Returns:
-            str: Handled location text
-        """
-        # Map of specific location patterns to their standardized forms
-        specific_locations = {
-            "El Atrio": "Centro Comercial 'El Atrio' (C/ Cámara, Cuba, Dr.), Avilés" if "Cuba" in location else location,
-            "La Florida con": "Centro Social La Florida, Oviedo",
-            "Factoría Cultural": "Factoría Cultural, Avilés",
-            "NIEMEYER": "Centro Niemeyer, Avilés"
-        }
-
-        # Check for specific location patterns
-        for pattern, replacement in specific_locations.items():
-            if pattern in location:
-                return replacement
-
-        # Handle truncated locations
-        if location.strip() == 'Plaza':
-            return 'Plaza de Asturias, Oviedo'
-        if location.strip() == 'Centro Social':
-            return 'Centro Social de Oviedo'
-        if 'Centro Social' in location and len(location.strip()) < 20:
-            return f"{location}, Oviedo"
-
-        return location
-
-    def _extract_venue_and_city(self, location):
-        """
-        Extract venue and city from location or truncate if too long.
-
-        Args:
-            location (str): Location text
-
-        Returns:
-            str: Extracted venue and city or truncated location
-        """
-        # If location is too long, try to extract just the venue name
-        if len(location) > 80:
-            # Try to extract just the venue name by looking for common patterns
-            venue_keywords = ['Teatro', 'Auditorio', 'Centro', 'Sala', 'Pabellón',
-                              'Plaza', 'Factoría', 'Museo', 'Arena']
-            venue_pattern = r'^([^,.]+(?:' + '|'.join(venue_keywords) + r')[^,.]{0,30})'
-            venue_match = re.match(venue_pattern, location)
-
-            if venue_match:
-                location = venue_match.group(1).strip()
-
-            # If still too long, truncate and add ellipsis
-            if len(location) > 80:
-                location = location[:77] + '...'
-
-        # Extract venue and city when possible using more flexible patterns
-        venue_keywords_str = '|'.join(['Teatro', 'Auditorio', 'Centro', 'Sala', 'Pabellón',
-                                      'Plaza', 'Factoría', 'Museo', 'Arena'])
-        venue_city_pattern = fr'([^,.]+(?:{venue_keywords_str})[^,.]+)(?:de|en)\s+([^,.]+)'
-
-        match = re.search(venue_city_pattern, location)
-        if match:
-            venue = match.group(1).strip()
-            city = match.group(2).strip()
-            # Remove any trailing dates or times
-            city = re.sub(r'\d+\s+de\s+\w+$', '', city).strip()
-            city = re.sub(r'el\s+\w+\s+\d+$', '', city).strip()
-            return f"{venue} ({city})"
-
-        # If the pattern didn't match but there's a venue keyword, clean it up
-        for keyword in ['Teatro', 'Auditorio', 'Centro', 'Sala', 'Pabellón',
-                        'Plaza', 'Factoría', 'Museo', 'Recinto']:
-            if keyword in location:
-                # Just clean up the location without trying to separate venue/city
-                location = re.sub(r'\d+\s+de\s+\w+', '', location).strip()
-                location = re.sub(r'el\s+\w+\s+\d+', '', location).strip()
-                return location
-
-        return location
 
     def format_to_markdown(self, events):
         """
@@ -317,9 +163,9 @@ class EventProcessor:
         Returns:
             dict: Prepared event info for markdown
         """
-        # Clean up the title - remove any quotes
+        # Clean up the title and fix capitalization
         title = event['title']
-        title = self._clean_title(title)
+        title = self.text_processor.clean_title(title, fix_capitalization=True)
 
         # Get source name and URL
         source_name, source_url = self._get_source_info(event)
@@ -336,49 +182,6 @@ class EventProcessor:
             'source_name': source_name,
             'source_url': source_url
         }
-
-    def _clean_title(self, title):
-        """
-        Clean up event title by removing quotes and fixing capitalization.
-
-        Args:
-            title (str): Raw title text
-
-        Returns:
-            str: Cleaned title
-        """
-        # Remove quotes
-        if title.startswith('"') and title.endswith('"'):
-            title = title[1:-1]
-        elif title.startswith('"'):
-            title = title[1:]
-        elif title.endswith('"'):
-            title = title[:-1]
-        # Remove any remaining quotes anywhere in the title
-        title = title.replace('"', '')
-
-        # Convert all-uppercase or partially uppercase titles to title case
-        words = title.split()
-        fixed_words = []
-
-        # List of small words that should be lowercase unless they're the first word
-        small_words = ['a', 'e', 'o', 'y', 'u', 'de', 'la', 'el', 'del', 'los', 'las',
-                      'en', 'con', 'por', 'para', 'al', 'su', 'sus', 'tu', 'tus',
-                      'mi', 'mis', 'un', 'una', 'unos', 'unas', 'lo', 'que']
-
-        for i, word in enumerate(words):
-            # Skip small common words and acronyms (2 chars or less)
-            if word.isupper() and len(word) > 2:
-                word = word.capitalize()
-            # Check if it's a lowercase common preposition/article and not the first word
-            elif word.lower() in small_words and i > 0:
-                word = word.lower()
-            # Capitalize first word
-            elif i == 0 and not word.isupper():
-                word = word.capitalize()
-            fixed_words.append(word)
-
-        return ' '.join(fixed_words)
 
     def _get_source_info(self, event):
         """

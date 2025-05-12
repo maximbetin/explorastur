@@ -10,9 +10,9 @@ from bs4 import BeautifulSoup
 import re
 import datetime
 from typing import Dict, List, Optional, Any, Union, Callable, cast, TypeVar
+from abc import ABC, abstractmethod
 
-from utils import DateProcessor, TextProcessor
-from scraper_utils import parse_html, make_absolute_url
+from utils import DateProcessor, TextProcessor, HtmlUtils, UrlUtils
 from scrapers.config import get_default_config
 
 logger = logging.getLogger('explorastur')
@@ -20,7 +20,99 @@ logger = logging.getLogger('explorastur')
 # Generic type for function return values
 T = TypeVar('T')
 
-class EventScraper:
+class BaseScraper(ABC):
+    """
+    Base abstract class for all scrapers.
+    Each scraper should inherit from this class and implement the scrape method.
+    """
+
+    def __init__(self, base_url: str, source_name: str):
+        """
+        Initialize the scraper with base URL and source name.
+
+        Args:
+            base_url: Base URL of the website to scrape
+            source_name: Name of the source (for attribution)
+        """
+        self.base_url = base_url
+        self.source_name = source_name
+
+    def fetch_page(self, url: Optional[str] = None) -> Optional[str]:
+        """
+        Fetch a page from the website.
+
+        Args:
+            url: URL to fetch (defaults to base_url if not provided)
+
+        Returns:
+            HTML content as string or None if fetch failed
+        """
+        target_url = url or self.base_url
+        logger.info(f"Fetching page: {target_url}")
+
+        try:
+            response = requests.get(target_url)
+            if response.status_code == 200:
+                return response.text
+            else:
+                logger.error(f"Failed to fetch page: {target_url}, status code: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"Error fetching page {target_url}: {e}")
+            return None
+
+    def fetch_and_parse(self, url: Optional[str] = None):
+        """
+        Fetch a page and parse it with BeautifulSoup.
+
+        Args:
+            url: URL to fetch (defaults to base_url if not provided)
+
+        Returns:
+            BeautifulSoup object or None if fetch or parse failed
+        """
+        html = self.fetch_page(url)
+        if html:
+            return HtmlUtils.parse_html(html)
+        return None
+
+    def make_absolute_url(self, relative_url: str) -> str:
+        """
+        Convert a relative URL to an absolute URL.
+
+        Args:
+            relative_url: Relative URL to convert
+
+        Returns:
+            Absolute URL
+        """
+        return UrlUtils.make_absolute_url(self.base_url, relative_url)
+
+    def add_source_info(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Add source information to events.
+
+        Args:
+            events: List of event dictionaries
+
+        Returns:
+            Events with source information added
+        """
+        for event in events:
+            event['source'] = self.source_name
+        return events
+
+    @abstractmethod
+    def scrape(self) -> List[Dict[str, Any]]:
+        """
+        Scrape events from the website.
+
+        Returns:
+            List of event dictionaries
+        """
+        pass
+
+class EventScraper(BaseScraper):
     """Base class for event scrapers.
 
     Provides common functionality for all event scrapers and defines
@@ -33,9 +125,6 @@ class EventScraper:
         Args:
             config: Configuration dictionary for the scraper
         """
-        self.date_processor = DateProcessor()
-        self.text_processor = TextProcessor()
-
         # Apply configuration - use defaults if none provided
         default_config = get_default_config()
         self.config = config or default_config
@@ -57,6 +146,13 @@ class EventScraper:
         self.retry_delay = int(self.config.get("retry_delay", default_config["retry_delay"]))
         self.headers = self.config.get("headers", default_config["headers"])
         self.max_pages = int(self.config.get("max_pages", default_config["max_pages"]))
+
+        # Initialize with base class
+        super().__init__(self.url, self.source_name)
+
+        # Initialize utility classes
+        self.date_processor = DateProcessor()
+        self.text_processor = TextProcessor()
 
     def handle_error(self, error: Exception, context: str, return_value: T) -> T:
         """Standard error handling for scrapers.
@@ -200,7 +296,7 @@ class EventScraper:
         """
         html = self.fetch_page_with_retry(url)
         if html:
-            return parse_html(html)
+            return HtmlUtils.parse_html(html)
         return None
 
     def create_event(self, title: str, date: str, location: str, url: str,
@@ -331,7 +427,7 @@ class EventScraper:
 
             # Make absolute URL if it's relative
             if not next_url.startswith(('http://', 'https://')):
-                next_url = make_absolute_url(base_url, next_url)
+                next_url = self.make_absolute_url(next_url)
 
             # Update for the next iteration
             current_url = next_url

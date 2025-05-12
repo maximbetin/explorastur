@@ -8,9 +8,10 @@ import requests
 from bs4 import BeautifulSoup
 from bs4.element import Tag, NavigableString
 from typing import Dict, List, Optional, Any
+from datetime import datetime
 
-from scrapers.base import EventScraper
-from scraper_utils import parse_html
+from utils import DateProcessor, TextProcessor, HtmlUtils
+from .base import EventScraper
 
 logger = logging.getLogger('explorastur')
 
@@ -34,7 +35,7 @@ class TelecableScraper(EventScraper):
                 return []
 
             # Use the parse_html utility instead of direct BeautifulSoup creation
-            soup = parse_html(html)
+            soup = HtmlUtils.parse_html(html)
             if not soup:
                 logger.error("Failed to parse HTML content")
                 return []
@@ -56,14 +57,19 @@ class TelecableScraper(EventScraper):
             events = []
             current_category = "General"
 
+            # Ensure article_body is a Tag before using find_all
+            if not isinstance(article_body, Tag):
+                logger.error("Article body is not a Tag object")
+                return []
+
             # Find all h2 headers (category headers) and p tags (event details)
             for element in article_body.find_all(['h2', 'p']):
-                if element.name == 'h2':
+                if isinstance(element, Tag) and element.name == 'h2':
                     # Start a new category
                     current_category = element.get_text().strip()
                     logger.debug(f"Processing category: {current_category}")
 
-                elif element.name == 'p':
+                elif isinstance(element, Tag) and element.name == 'p':
                     # Look for paragraphs that start with bold text (typically event titles)
                     bold_elements = element.find_all(['b', 'strong'])
                     if bold_elements:

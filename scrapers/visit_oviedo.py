@@ -6,9 +6,10 @@ import logging
 import re
 from bs4 import BeautifulSoup, Tag
 from typing import Dict, List, Optional, Any, cast
+from datetime import datetime
 
-from scrapers.base import EventScraper
-from scraper_utils import make_absolute_url
+from utils import UrlUtils
+from .base import EventScraper
 
 logger = logging.getLogger('explorastur')
 
@@ -143,7 +144,7 @@ class VisitOviedoScraper(EventScraper):
 
             # Make URL absolute if it's relative
             if event_url and not event_url.startswith(('http://', 'https://')):
-                event_url = make_absolute_url(self.base_url, event_url)
+                event_url = UrlUtils.make_absolute_url(self.base_url, event_url)
 
             # First try to get title from link title attribute as this may be cleaner
             title = ""

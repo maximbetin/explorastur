@@ -8,8 +8,8 @@ from bs4 import BeautifulSoup
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-from scrapers.base import EventScraper
-from scraper_utils import make_absolute_url
+from utils import UrlUtils
+from .base import EventScraper
 
 logger = logging.getLogger('explorastur')
 
@@ -69,7 +69,7 @@ class BiodevasScraper(EventScraper):
             title = title_element.get_text().strip()
             event_url = title_element.get('href', '')
             if not event_url.startswith('http'):
-                event_url = make_absolute_url(self.base_url, event_url)
+                event_url = UrlUtils.make_absolute_url(self.base_url, event_url)
 
             # Skip if no title found
             if not title:
