@@ -232,7 +232,7 @@ To add a new scraper:
 1. Create a new file in the `scrapers/` directory (e.g., `new_source.py`)
 2. Implement a class that inherits from `EventScraper`
 3. Add the scraper to the configuration in `config.py`
-4. Add the class to the class mapping in `factory.py`
+4. Add the class to the registry in `factory.py`
 
 Example:
 
@@ -254,23 +254,16 @@ class NewSourceScraper(EventScraper):
         return events
 ```
 
-Then add to configuration:
+Then add to the registry:
 
 ```python
-# In scrapers/config.py
-SITE_CONFIGS = {
-    # ... existing configs ...
-    "new_source": {
-        "name": "New Source",
-        "url": "https://example.com/events",
-        "enabled": True,
-    },
-}
-
 # In scrapers/factory.py
-SCRAPER_CLASS_MAP = {
-    # ... existing mappings ...
-    "new_source": "NewSourceScraper",
+SCRAPER_REGISTRY = {
+    # ... existing registrations ...
+    "new_source": {
+        "class_name": "NewSourceScraper",
+        "module_path": "scrapers.new_source"
+    },
 }
 ```
 
