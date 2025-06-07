@@ -11,17 +11,23 @@ LLM_MODEL = os.getenv("LLM_MODEL", "default")  # Model identifier if needed
 
 # Default prompt template for event extraction
 DEFAULT_PROMPT_TEMPLATE = """
-Extract event information from the following HTML content. Return a JSON array with objects containing these fields:
-- title: The name or title of the event
-- date: The date of the event (YYYY-MM-DD format if possible)
-- time: The time of the event
-- location: Where the event takes place
-- description: A brief description of the event
+You are an assistant that extracts structured information from raw HTML or text.
 
-HTML Content:
-{html_content}
+The following content contains event listings. Extract ** all upcoming events ** and return them as a JSON list. Each event should be an object with the following fields:
 
-Return ONLY a valid JSON array with the extracted events, nothing else.
+- "title": Short name of the event
+- "date": In "YYYY-MM-DD" format (or best effort if not available)
+- "time": In "HH:MM" 24-hour format (or "All day" / "Unknown" if unclear)
+- "location": Venue or address
+- "description": 1–2 sentence summary
+
+Only include actual events — skip ads, generic text, or navigation elements.
+
+# Event Content Start
+{event_html}
+# Event Content End
+
+Now return only the JSON array of events, no extra text.
 """
 
 # Output settings
