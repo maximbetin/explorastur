@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # LLM API settings
-LLM_API_BASE_URL = os.getenv("LLM_API_BASE_URL", "http://192.168.1.231:1234/v1")
+LLM_API_BASE_URL = os.getenv("LLM_API_BASE_URL", "http://192.168.1.216:1234/v1")
 
 # Default prompt template for event extraction
 DEFAULT_PROMPT_TEMPLATE = """
