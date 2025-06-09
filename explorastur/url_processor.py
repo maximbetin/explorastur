@@ -1,13 +1,14 @@
 """Module for processing URLs and extracting event information using LLM."""
-from typing import List, Optional, Dict, Any
+import json
 from dataclasses import dataclass
 from datetime import datetime
-import json
-import httpx
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+import httpx
+
+from explorastur.config import DEFAULT_PROMPT_TEMPLATE, LLM_API_BASE_URL
 from explorastur.event_parser import Event, parse_events
-from explorastur.config import LLM_API_BASE_URL, DEFAULT_PROMPT_TEMPLATE
 
 
 @dataclass
@@ -47,20 +48,7 @@ class URLEventProcessor:
 
   def _get_llm_response(self, url: str) -> List[Dict[str, Any]]:
     """Get event information from LLM for a given URL."""
-    prompt = f"""
-        Analyze the content at this URL and extract all upcoming events:
-        {url}
-
-        Return a JSON array of events, where each event has these fields:
-        - "title": Short name of the event
-        - "date": In "YYYY-MM-DD" format (or best effort if not available)
-        - "time": In "HH:MM" 24-hour format (or "All day" / "Unknown" if unclear)
-        - "location": Venue or address
-        - "description": 1–2 sentence summary
-
-        Only include actual events — skip ads, generic text, or navigation elements.
-        Return only the JSON array, no extra text.
-        """
+    prompt = DEFAULT_PROMPT_TEMPLATE.format(url=url)
 
     url = f"{self.api_base_url}/chat/completions"
     payload = {

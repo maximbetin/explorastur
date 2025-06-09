@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, field_validator
 
 
 class Event(BaseModel):
@@ -15,7 +15,8 @@ class Event(BaseModel):
   location: Optional[str] = None
   description: Optional[str] = None
 
-  @validator("date", pre=True)
+  @field_validator("date", mode="before")
+  @classmethod
   def validate_date(cls, v):
     """Validate and normalize date format if possible."""
     if not v:

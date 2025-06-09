@@ -21,7 +21,7 @@ ExplorAstur is a modular Python tool that extracts event information from web pa
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/explorastur.git
+   git clone https://github.com/maximbetin/explorastur.git
    cd explorastur
    ```
 

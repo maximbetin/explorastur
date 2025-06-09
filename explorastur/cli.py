@@ -2,10 +2,10 @@
 import argparse
 import json
 import sys
-from typing import List, Optional
 from pathlib import Path
+from typing import List, Optional
 
-from explorastur.url_processor import URLEventProcessor, ProcessingResult
+from explorastur.url_processor import ProcessingResult, URLEventProcessor
 
 
 def format_result(result: ProcessingResult, format_type: str = "json") -> str:
